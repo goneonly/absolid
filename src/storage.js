@@ -1,0 +1,72 @@
+// 로컬(기기) 저장소 — Day 2에서 Supabase로 확장 예정
+const RECORDS_KEY = 'absday.records.v1'
+const PROFILE_KEY = 'absday.profile.v1'
+
+export function todayKey(d = new Date()) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+// 오늘 날짜의 "일" 기준 운동 Day 번호 (31일 → day 30)
+export function todayWorkoutDay(d = new Date()) {
+  return Math.min(d.getDate(), 30)
+}
+
+export function getRecords() {
+  try { return JSON.parse(localStorage.getItem(RECORDS_KEY)) || {} } catch { return {} }
+}
+
+export function saveRecord(dateKey, rec) {
+  const all = getRecords()
+  all[dateKey] = { ...(all[dateKey] || {}), ...rec }
+  localStorage.setItem(RECORDS_KEY, JSON.stringify(all))
+  return all
+}
+
+export function clearRecords() {
+  localStorage.removeItem(RECORDS_KEY)
+}
+
+export function computeStreak(records = getRecords()) {
+  let streak = 0
+  const d = new Date()
+  // 오늘 안 했으면 어제부터 카운트 (streak는 아직 깨지지 않음)
+  if (!records[todayKey(d)]?.completed) d.setDate(d.getDate() - 1)
+  while (records[todayKey(d)]?.completed) {
+    streak++
+    d.setDate(d.getDate() - 1)
+  }
+  return streak
+}
+
+export function lastNDays(n, records = getRecords()) {
+  const out = []
+  const d = new Date()
+  d.setDate(d.getDate() - (n - 1))
+  for (let i = 0; i < n; i++) {
+    const key = todayKey(d)
+    out.push({ key, date: new Date(d), done: !!records[key]?.completed })
+    d.setDate(d.getDate() + 1)
+  }
+  return out
+}
+
+export function getProfile() {
+  try { return JSON.parse(localStorage.getItem(PROFILE_KEY)) || { nickname: '' } } catch { return { nickname: '' } }
+}
+
+export function saveProfile(p) {
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(p))
+}
+
+// 서버 기록을 로컬로 병합 (로컬에만 있는 사진 등은 유지)
+export function mergeRecords(server) {
+  if (!server) return
+  const all = getRecords()
+  for (const [k, v] of Object.entries(server)) {
+    all[k] = { ...v, ...(all[k] || {}) }
+  }
+  localStorage.setItem(RECORDS_KEY, JSON.stringify(all))
+}
