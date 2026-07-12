@@ -33,6 +33,29 @@ export async function fetchServerRecords() {
   return out
 }
 
+// ── 사진 업로드 (Day 5) ─────────────────────
+// 인증샷(dataURL)을 Storage에 올리고 기록에 photo_url 연결
+export async function uploadPhoto(dateKey, dataUrl) {
+  const user_id = await uid()
+  if (!user_id || !dataUrl) return null
+  try {
+    const blob = await (await fetch(dataUrl)).blob()
+    const path = `${user_id}/${dateKey}.jpg`
+    const { error } = await supabase.storage
+      .from('photos')
+      .upload(path, blob, { upsert: true, contentType: 'image/jpeg' })
+    if (error) return null
+    const { data } = supabase.storage.from('photos').getPublicUrl(path)
+    const photo_url = data?.publicUrl || null
+    if (photo_url) {
+      await supabase.from('workouts')
+        .update({ photo_url })
+        .eq('user_id', user_id).eq('date', dateKey)
+    }
+    return photo_url
+  } catch { return null }
+}
+
 // ── 그룹 (Day 3~4) ──────────────────────────
 
 // 닉네임을 서버 프로필에 반영 (그룹에서 이름이 보이도록)

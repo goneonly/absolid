@@ -16,6 +16,10 @@
 2. 이 폴더의 `supabase/schema.sql` 파일 내용을 전부 복사해 붙여넣기
 3. **Run** 클릭 → "Success" 확인
 
+## 2-1. 사진 저장소 만들기 (Day 5)
+같은 방법으로 **SQL Editor → New query**에 `supabase/storage.sql` 내용을 붙여넣고 **Run**.
+(인증샷 업로드용 공개 버킷과 보안 규칙이 만들어져요)
+
 ## 3. 이메일 인증 끄기 (데모용, 선택)
 회원가입 시 메일 인증 없이 바로 로그인되게 하려면:
 1. **Authentication → Sign In / Providers → Email**

@@ -396,6 +396,28 @@ async function syncLocalToServer() {
   if (rows.length) await supabase.from('workouts').upsert(rows, { onConflict: 'user_id,date' })
 }
 
+// ── 사진 업로드 (Day 5) ─────────────────────
+async function uploadPhoto(dateKey, dataUrl) {
+  const user_id = await uid()
+  if (!user_id || !dataUrl) return null
+  try {
+    const blob = await (await fetch(dataUrl)).blob()
+    const path = `${user_id}/${dateKey}.jpg`
+    const { error } = await supabase.storage
+      .from('photos')
+      .upload(path, blob, { upsert: true, contentType: 'image/jpeg' })
+    if (error) return null
+    const { data } = supabase.storage.from('photos').getPublicUrl(path)
+    const photo_url = data?.publicUrl || null
+    if (photo_url) {
+      await supabase.from('workouts')
+        .update({ photo_url })
+        .eq('user_id', user_id).eq('date', dateKey)
+    }
+    return photo_url
+  } catch (_) { return null }
+}
+
 // ── 그룹 (Day 3~4) ──────────────────────────
 async function pushProfile(nickname) {
   const user_id = await uid()
@@ -817,7 +839,10 @@ function Workout({ onDone }) {
 
   function handleSave(photo) {
     const completedAt = new Date().toISOString()
-    pushRecord(todayKey(), day, completedAt).catch(() => {}) // 로그인 상태면 서버에도 저장
+    // 로그인 상태면 서버에도 저장 + 인증샷 업로드 (Day 5)
+    pushRecord(todayKey(), day, completedAt)
+      .then(() => uploadPhoto(todayKey(), photo))
+      .catch(() => {})
     saveRecord(todayKey(), {
       completed: true,
       completedAt,
@@ -875,6 +900,22 @@ function Settings({ session, onChanged }) {
     onChanged()
   }
 
+  // 기록을 CSV로 내려받기 — 구글시트에서 파일 > 가져오기로 바로 열 수 있어요 (Day 6)
+  function exportCSV() {
+    const records = getRecords()
+    const rows = [['날짜', 'Day', '완료 시각', '사진']]
+    for (const k of Object.keys(records).sort()) {
+      const r = records[k]
+      if (r.completed) rows.push([k, r.day || '', r.completedAt || '', r.photoUrl || ''])
+    }
+    const csv = '﻿' + rows.map(r => r.join(',')).join('\r\n') // BOM: 한글 깨짐 방지
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    a.download = `absday-records-${todayKey()}.csv`
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+
   function reset() {
     if (confirm('이 기기의 운동 기록을 삭제할까요? 되돌릴 수 없어요.')) {
       clearRecords()
@@ -904,10 +945,13 @@ function Settings({ session, onChanged }) {
       <AccountCard session={session} nickname={nickname} />
 
       <section className="card">
+        <button className="row-btn" onClick={exportCSV}>
+          기록 내보내기 (CSV) <span className="hint">구글시트에서 열기 가능</span>
+        </button>
         <button className="row-btn danger" onClick={reset}>운동 기록 초기화 (이 기기)</button>
       </section>
 
-      <p className="sub" style={{ marginTop: 16, textAlign: 'center' }}>AbsDay v0.2 · 데모</p>
+      <p className="sub" style={{ marginTop: 16, textAlign: 'center' }}>AbsDay v1.0 · 데모</p>
     </main>
   )
 }

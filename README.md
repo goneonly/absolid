@@ -6,9 +6,9 @@
 - [x] Day 1: 앱 뼈대 — 홈(streak), 운동 페이지(날짜별 영상 + 종료 감지), 완료 모달(사진 첨부), 하단바, 디자인 시스템
 - [x] Day 2: Supabase 연동 코드 (회원가입/로그인 UI, 기록 동기화, DB 스키마) — 프로젝트 키 연결만 남음 (SUPABASE_SETUP.md)
 - [x] Day 3–4: 그룹 만들기/초대 코드 참여, 멤버 운동현황 색상 표시(오늘 + 최근 7일)
-- [ ] Day 5: 사진 업로드 서버 저장
-- [ ] Day 6: 설정 고도화, 구글시트 내보내기, 구글 로그인(옵션)
-- [ ] Day 7: 테스트 + Vercel 배포
+- [x] Day 5: 사진 업로드 서버 저장 (Supabase Storage — supabase/storage.sql 실행 필요)
+- [x] Day 6: 설정 고도화, 기록 CSV 내보내기(구글시트 호환) — 구글 로그인은 옵션이라 보류
+- [x] Day 7: 검증 + Vercel 배포 (https://absday.vercel.app)
 
 ## 실행 방법 (개발자용)
 ```bash

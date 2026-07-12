@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { getProfile, saveProfile, clearRecords } from '../storage.js'
+import { getProfile, saveProfile, clearRecords, getRecords, todayKey } from '../storage.js'
 import { supabase } from '../supabase.js'
 import { signUp, signIn, signOut, saveNickname } from '../auth.js'
 
@@ -13,6 +13,22 @@ export default function Settings({ session, onChanged }) {
     setSaved(true)
     setTimeout(() => setSaved(false), 1500)
     onChanged()
+  }
+
+  // 기록을 CSV로 내려받기 — 구글시트에서 파일 > 가져오기로 바로 열 수 있어요 (Day 6)
+  function exportCSV() {
+    const records = getRecords()
+    const rows = [['날짜', 'Day', '완료 시각', '사진']]
+    for (const k of Object.keys(records).sort()) {
+      const r = records[k]
+      if (r.completed) rows.push([k, r.day || '', r.completedAt || '', r.photoUrl || ''])
+    }
+    const csv = '﻿' + rows.map(r => r.join(',')).join('\r\n') // BOM: 엑셀/시트 한글 깨짐 방지
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    a.download = `absday-records-${todayKey()}.csv`
+    a.click()
+    URL.revokeObjectURL(a.href)
   }
 
   function reset() {
@@ -44,10 +60,13 @@ export default function Settings({ session, onChanged }) {
       <AccountCard session={session} nickname={nickname} />
 
       <section className="card">
+        <button className="row-btn" onClick={exportCSV}>
+          기록 내보내기 (CSV) <span className="hint">구글시트에서 열기 가능</span>
+        </button>
         <button className="row-btn danger" onClick={reset}>운동 기록 초기화 (이 기기)</button>
       </section>
 
-      <p className="sub" style={{ marginTop: 16, textAlign: 'center' }}>AbsDay v0.2 · 데모</p>
+      <p className="sub" style={{ marginTop: 16, textAlign: 'center' }}>AbsDay v1.0</p>
     </main>
   )
 }

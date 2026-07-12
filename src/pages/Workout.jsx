@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { loadYouTubeAPI, PLAYLIST_ID } from '../youtube.js'
 import { todayWorkoutDay, todayKey, saveRecord } from '../storage.js'
 import CompleteModal from '../components/CompleteModal.jsx'
-import { pushRecord } from '../api.js'
+import { pushRecord, uploadPhoto } from '../api.js'
 
 export default function Workout({ onDone }) {
   const holderRef = useRef(null)
@@ -58,7 +58,10 @@ export default function Workout({ onDone }) {
 
   function handleSave(photo) {
     const completedAt = new Date().toISOString()
-    pushRecord(todayKey(), day, completedAt).catch(() => {}) // 로그인 상태면 서버에도 저장
+    // 로그인 상태면 서버에도 저장 + 인증샷 업로드 (Day 5)
+    pushRecord(todayKey(), day, completedAt)
+      .then(() => uploadPhoto(todayKey(), photo))
+      .catch(() => {})
     saveRecord(todayKey(), {
       completed: true,
       completedAt,
