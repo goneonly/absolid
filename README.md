@@ -1,3 +1,5 @@
+Personal Project w/ Full Vibe Coding
+
 # AbsDay — 매일 복근, 같이 💪
 
 초대 코드로 그룹을 만들어 날짜에 맞춰 복근 운동을 함께 하고 기록하는 모바일 웹앱.
