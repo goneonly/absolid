@@ -14,19 +14,26 @@ returns boolean language sql security definer set search_path = public as $$
   );
 $$;
 
--- ── 3) 관리자 권한 정책 ──────────────────────
+-- ── 3) 관리자 권한 정책 (재실행 안전) ─────────
+drop policy if exists "profiles: 관리자 수정" on public.profiles;
 create policy "profiles: 관리자 수정" on public.profiles
   for update using (public.is_admin());
+drop policy if exists "workouts: 관리자 조회" on public.workouts;
 create policy "workouts: 관리자 조회" on public.workouts
   for select using (public.is_admin());
+drop policy if exists "workouts: 관리자 수정" on public.workouts;
 create policy "workouts: 관리자 수정" on public.workouts
   for update using (public.is_admin());
+drop policy if exists "groups: 관리자 삭제" on public.groups;
 create policy "groups: 관리자 삭제" on public.groups
   for delete using (public.is_admin());
+drop policy if exists "members: 관리자 조회" on public.group_members;
 create policy "members: 관리자 조회" on public.group_members
   for select using (public.is_admin());
+drop policy if exists "members: 관리자 삭제" on public.group_members;
 create policy "members: 관리자 삭제" on public.group_members
   for delete using (public.is_admin());
+drop policy if exists "photos: 관리자 삭제" on storage.objects;
 create policy "photos: 관리자 삭제" on storage.objects
   for delete using (bucket_id = 'photos' and public.is_admin());
 
@@ -42,10 +49,13 @@ create table if not exists public.reports (
 );
 alter table public.reports enable row level security;
 
+drop policy if exists "reports: 본인 신고 생성" on public.reports;
 create policy "reports: 본인 신고 생성" on public.reports
   for insert with check (auth.uid() = reporter_id);
+drop policy if exists "reports: 관리자 조회" on public.reports;
 create policy "reports: 관리자 조회" on public.reports
   for select using (public.is_admin());
+drop policy if exists "reports: 관리자 처리" on public.reports;
 create policy "reports: 관리자 처리" on public.reports
   for update using (public.is_admin());
 
@@ -58,12 +68,16 @@ create table if not exists public.announcements (
 );
 alter table public.announcements enable row level security;
 
+drop policy if exists "announcements: 누구나 조회" on public.announcements;
 create policy "announcements: 누구나 조회" on public.announcements
   for select using (true);
+drop policy if exists "announcements: 관리자 생성" on public.announcements;
 create policy "announcements: 관리자 생성" on public.announcements
   for insert with check (public.is_admin());
+drop policy if exists "announcements: 관리자 수정" on public.announcements;
 create policy "announcements: 관리자 수정" on public.announcements
   for update using (public.is_admin());
+drop policy if exists "announcements: 관리자 삭제" on public.announcements;
 create policy "announcements: 관리자 삭제" on public.announcements
   for delete using (public.is_admin());
 
@@ -74,10 +88,13 @@ create table if not exists public.app_config (
 );
 alter table public.app_config enable row level security;
 
+drop policy if exists "config: 누구나 조회" on public.app_config;
 create policy "config: 누구나 조회" on public.app_config
   for select using (true);
+drop policy if exists "config: 관리자 생성" on public.app_config;
 create policy "config: 관리자 생성" on public.app_config
   for insert with check (public.is_admin());
+drop policy if exists "config: 관리자 수정" on public.app_config;
 create policy "config: 관리자 수정" on public.app_config
   for update using (public.is_admin());
 
