@@ -12,8 +12,8 @@ import { flushPendingProfile, signOut } from './auth.js'
 import { fetchServerRecords, syncLocalToServer, cleanupOldServerPhotos } from './api.js'
 import { fetchMyRole } from './admin.js'
 
-const CLEANUP_KEY = 'absday.cleanup.v1'
-const ONBOARD_KEY = 'absday.onboarding.v1'
+const CLEANUP_KEY = 'absolid.cleanup.v1'
+const ONBOARD_KEY = 'absolid.onboarding.v1'
 
 export default function App() {
   // view: home | workout | group | settings | admin
@@ -79,7 +79,7 @@ export default function App() {
             <path d="M8 18 L13 7 L18 18" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
             <path d="M10 14.5 H16" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" />
           </svg>
-          <strong>Abs<em>Day</em></strong>
+          <strong>Abs<em>olid</em></strong>
         </button>
         {session && <span className="tag">로그인됨</span>}
       </header>

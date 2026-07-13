@@ -68,7 +68,7 @@ export default function Settings({ session, onChanged, isAdmin, onOpenAdmin }) {
     a.href = URL.createObjectURL(
       new Blob([csv], { type: "text/csv;charset=utf-8" }),
     );
-    a.download = `absday-records-${todayKey()}.csv`;
+    a.download = `absolid-records-${todayKey()}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
   }
@@ -142,7 +142,7 @@ export default function Settings({ session, onChanged, isAdmin, onOpenAdmin }) {
       )}
 
       <p className="sub" style={{ marginTop: 16, textAlign: "center" }}>
-        AbsDay v{__APP_VERSION__}
+        Absolid v{__APP_VERSION__}
       </p>
       <div className="footer-links">
         <a
@@ -154,7 +154,7 @@ export default function Settings({ session, onChanged, isAdmin, onOpenAdmin }) {
         </a>
         <span aria-hidden="true">·</span>
         <a
-          href="https://github.com/goneonly/absday"
+          href="https://github.com/goneonly/absolid"
           target="_blank"
           rel="noreferrer"
         >
@@ -410,7 +410,7 @@ function AccountCard({ session, nickname }) {
     // 온보딩 플래그는 가입 요청 "전"에 저장해야 함 —
     // 가입 성공 시 세션 발급(App의 팝업 체크)이 응답보다 먼저 일어나기 때문
     if (mode === "signup") {
-      localStorage.setItem("absday.onboarding.v1", "pending");
+      localStorage.setItem("absolid.onboarding.v1", "pending");
     }
     const fn =
       mode === "signup"
@@ -427,7 +427,7 @@ function AccountCard({ session, nickname }) {
     setBusy(false);
     if (res?.error) {
       if (mode === "signup") {
-        localStorage.removeItem("absday.onboarding.v1"); // 가입 실패 시 롤백
+        localStorage.removeItem("absolid.onboarding.v1"); // 가입 실패 시 롤백
       }
       setError(res.error);
       return;
