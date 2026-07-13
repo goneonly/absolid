@@ -1,4 +1,4 @@
--- AbsDay 관리자 모드 v1 — Supabase SQL Editor에서 실행
+-- Absolid 관리자 모드 v1 — Supabase SQL Editor에서 실행
 -- 포함: 역할/활성 컬럼, 관리자 정책, 신고, 공지, 앱 설정, 통계 함수
 
 -- ── 1) 역할·활성 컬럼 ────────────────────────

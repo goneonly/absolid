@@ -6,7 +6,7 @@
 ## 1. 계정 및 프로젝트 만들기
 1. https://supabase.com 접속 → **Start your project** → GitHub 또는 이메일로 가입
 2. **New project** 클릭
-   - Name: `absday`
+   - Name: `absolid`
    - Database Password: 아무 강한 비밀번호 (메모해 두세요)
    - Region: `Northeast Asia (Seoul)` 선택
 3. 1~2분 뒤 프로젝트가 준비됩니다.

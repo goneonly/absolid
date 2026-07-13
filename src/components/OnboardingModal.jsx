@@ -52,9 +52,9 @@ export default function OnboardingModal({ onClose }) {
 
   return (
     <div className="modal-backdrop">
-      <div className="modal" role="dialog" aria-modal="true" aria-label="AbsDay 기능 소개">
+      <div className="modal" role="dialog" aria-modal="true" aria-label="Absolid 기능 소개">
         <h3>환영해요! 🎉</h3>
-        <p className="sub">AbsDay에서 이런 걸 할 수 있어요</p>
+        <p className="sub">Absolid에서 이런 걸 할 수 있어요</p>
 
         <div className="onb-art">{slide.art}</div>
         <strong className="onb-title">{slide.title}</strong>

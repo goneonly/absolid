@@ -1,4 +1,4 @@
--- AbsDay 프로필 사진 — Supabase SQL Editor에 붙여넣어 실행
+-- Absolid 프로필 사진 — Supabase SQL Editor에 붙여넣어 실행
 -- 1) profiles에 avatar_url 컬럼 추가
 alter table public.profiles
   add column if not exists avatar_url text;

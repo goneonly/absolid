@@ -1,4 +1,4 @@
--- AbsDay DB 스키마 v1 (Supabase SQL Editor에 붙여넣어 실행)
+-- Absolid DB 스키마 v1 (Supabase SQL Editor에 붙여넣어 실행)
 -- 포함: 프로필, 운동 기록, 그룹(Day 3~4에서 사용)
 
 -- ── 프로필 ──────────────────────────────────

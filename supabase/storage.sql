@@ -1,4 +1,4 @@
--- AbsDay 사진 저장소 (Day 5) — Supabase SQL Editor에 붙여넣어 실행
+-- Absolid 사진 저장소 (Day 5) — Supabase SQL Editor에 붙여넣어 실행
 -- 인증샷 버킷: 누구나 볼 수 있는 공개 버킷, 업로드는 본인 폴더에만 가능
 
 insert into storage.buckets (id, name, public)

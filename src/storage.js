@@ -1,6 +1,6 @@
 // 로컬(기기) 저장소 — Day 2에서 Supabase로 확장 예정
-const RECORDS_KEY = 'absday.records.v1'
-const PROFILE_KEY = 'absday.profile.v1'
+const RECORDS_KEY = 'absolid.records.v1'
+const PROFILE_KEY = 'absolid.profile.v1'
 
 export function todayKey(d = new Date()) {
   const y = d.getFullYear()
@@ -83,7 +83,4 @@ export function mergeRecords(server) {
   if (!server) return
   const all = getRecords()
   for (const [k, v] of Object.entries(server)) {
-    all[k] = { ...v, ...(all[k] || {}) }
-  }
-  localStorage.setItem(RECORDS_KEY, JSON.stringify(all))
-}
+    all[k] = { ...v

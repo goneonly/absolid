@@ -1,6 +1,6 @@
 Personal Project w/ Full Vibe Coding
 
-# AbsDay — 매일 복근, 같이 💪
+# Absolid — 매일 복근, 같이 💪
 
 초대 코드로 그룹을 만들어 날짜에 맞춰 복근 운동을 함께 하고 기록하는 모바일 웹앱.
 
@@ -10,7 +10,7 @@ Personal Project w/ Full Vibe Coding
 - [x] Day 3–4: 그룹 만들기/초대 코드 참여, 멤버 운동현황 색상 표시(오늘 + 최근 7일)
 - [x] Day 5: 사진 업로드 서버 저장 (Supabase Storage — supabase/storage.sql 실행 필요)
 - [x] Day 6: 설정 고도화, 기록 CSV 내보내기(구글시트 호환) — 구글 로그인은 옵션이라 보류
-- [x] Day 7: 검증 + Vercel 배포 (https://absday.vercel.app)
+- [x] Day 7: 검증 + Vercel 배포 (https://absolid.vercel.app)
 
 ## 실행 방법 (개발자용)
 ```bash

@@ -68,7 +68,7 @@ export default function Settings({ session, onChanged, isAdmin, onOpenAdmin }) {
     a.href = URL.createObjectURL(
       new Blob([csv], { type: "text/csv;charset=utf-8" }),
     );
-    a.download = `absday-records-${todayKey()}.csv`;
+    a.download = `absolid-records-${todayKey()}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
   }
@@ -142,7 +142,7 @@ export default function Settings({ session, onChanged, isAdmin, onOpenAdmin }) {
       )}
 
       <p className="sub" style={{ marginTop: 16, textAlign: "center" }}>
-        AbsDay v{__APP_VERSION__}
+        Absolid v{__APP_VERSION__}
       </p>
       <div className="footer-links">
         <a
@@ -154,7 +154,7 @@ export default function Settings({ session, onChanged, isAdmin, onOpenAdmin }) {
         </a>
         <span aria-hidden="true">·</span>
         <a
-          href="https://github.com/goneonly/absday"
+          href="https://github.com/goneonly/absolid"
           target="_blank"
           rel="noreferrer"
         >
@@ -410,7 +410,7 @@ function AccountCard({ session, nickname }) {
     // 온보딩 플래그는 가입 요청 "전"에 저장해야 함 —
     // 가입 성공 시 세션 발급(App의 팝업 체크)이 응답보다 먼저 일어나기 때문
     if (mode === "signup") {
-      localStorage.setItem("absday.onboarding.v1", "pending");
+      localStorage.setItem("absolid.onboarding.v1", "pending");
     }
     const fn =
       mode === "signup"
@@ -427,7 +427,7 @@ function AccountCard({ session, nickname }) {
     setBusy(false);
     if (res?.error) {
       if (mode === "signup") {
-        localStorage.removeItem("absday.onboarding.v1"); // 가입 실패 시 롤백
+        localStorage.removeItem("absolid.onboarding.v1"); // 가입 실패 시 롤백
       }
       setError(res.error);
       return;
@@ -472,207 +472,4 @@ function AccountCard({ session, nickname }) {
                   clearFieldError("fullName");
                 }}
               />
-              {fieldErrors.fullName && (
-                <p className="field-error">{fieldErrors.fullName}</p>
-              )}
-            </div>
-            <div className="field">
-              <label htmlFor="phone">전화번호</label>
-              <input
-                id="phone"
-                type="tel"
-                required
-                value={phone}
-                maxLength={13}
-                placeholder="010-0000-0000"
-                autoComplete="tel"
-                inputMode="numeric"
-                aria-invalid={!!fieldErrors.phone}
-                onBlur={() =>
-                  setFieldErrors((p) => ({
-                    ...p,
-                    phone: phone ? validatePhone(phone) : "",
-                  }))
-                }
-                onChange={(e) => {
-                  setPhone(formatPhone(e.target.value));
-                  clearFieldError("phone");
-                }}
-              />
-              {fieldErrors.phone && (
-                <p className="field-error">{fieldErrors.phone}</p>
-              )}
-            </div>
-          </>
-        )}
-        <div className="field">
-          <label htmlFor="email">이메일</label>
-          <input
-            id="email"
-            type="email"
-            required
-            value={email}
-            placeholder="name@example.com"
-            autoComplete="email"
-            aria-invalid={!!fieldErrors.email}
-            onBlur={() =>
-              setFieldErrors((p) => ({
-                ...p,
-                email: email ? validateEmail(email) : "",
-              }))
-            }
-            onChange={(e) => {
-              setEmail(e.target.value);
-              clearFieldError("email");
-            }}
-          />
-          {fieldErrors.email && (
-            <p className="field-error">{fieldErrors.email}</p>
-          )}
-        </div>
-        <div className="field">
-          <label htmlFor="pw">
-            {mode === "signup" ? "비밀번호 (6자 이상, 영문+숫자)" : "비밀번호"}
-          </label>
-          <input
-            id="pw"
-            type="password"
-            required
-            minLength={6}
-            value={password}
-            autoComplete={
-              mode === "signup" ? "new-password" : "current-password"
-            }
-            aria-invalid={!!fieldErrors.password}
-            onBlur={() =>
-              mode === "signup" &&
-              setFieldErrors((p) => ({
-                ...p,
-                password: password ? validatePassword(password) : "",
-              }))
-            }
-            onChange={(e) => {
-              setPassword(e.target.value);
-              clearFieldError("password");
-            }}
-          />
-          {fieldErrors.password && (
-            <p className="field-error">{fieldErrors.password}</p>
-          )}
-        </div>
-        {mode === "signup" && (
-          <div className="consent">
-            <label className="consent-row">
-              <input
-                type="checkbox"
-                checked={agreed}
-                onChange={(e) => {
-                  setAgreed(e.target.checked);
-                  clearFieldError("agreed");
-                }}
-              />
-              <span>개인정보 수집 및 이용에 동의합니다. (필수)</span>
-            </label>
-            <button
-              type="button"
-              className="linklike"
-              style={{ textDecoration: "underline" }}
-              onClick={() => setShowPrivacy(true)}
-            >
-              자세히 보기
-            </button>
-            {fieldErrors.agreed && (
-              <p className="field-error">{fieldErrors.agreed}</p>
-            )}
-          </div>
-        )}
-        {error && (
-          <p className="sub" style={{ color: "var(--red)", marginTop: 10 }}>
-            {error}
-          </p>
-        )}
-        {notice && (
-          <p className="sub" style={{ marginTop: 10 }}>
-            {notice}
-          </p>
-        )}
-        <button
-          className="cta"
-          type="submit"
-          disabled={busy}
-          style={{ marginTop: 14 }}
-        >
-          {busy ? "처리 중…" : mode === "signup" ? "가입하기" : "로그인"}
-        </button>
-      </form>
-      <button
-        className="cta secondary"
-        style={{ marginTop: 10 }}
-        onClick={() => {
-          setMode(mode === "signup" ? "signin" : "signup");
-          setError("");
-          setNotice("");
-          setFieldErrors({});
-          setAgreed(false);
-        }}
-      >
-        {mode === "signup" ? "이미 계정이 있나요? 로그인" : "회원가입"}
-      </button>
-      {showPrivacy && <PrivacyModal onClose={() => setShowPrivacy(false)} />}
-    </section>
-  );
-}
-
-// ── 개인정보 처리 동의 전문 모달 ───────────────
-function PrivacyModal({ onClose }) {
-  return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div
-        className="modal privacy-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-label="개인정보 처리 동의"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3>개인정보 처리 동의 (필수)</h3>
-        <div className="privacy-body">
-          <p>
-            본 서비스는 회원가입 및 운동 기록 관리 서비스를 제공하기 위해
-            아래와 같이 개인정보를 수집·이용합니다.
-          </p>
-          <strong>수집 항목</strong>
-          <ul>
-            <li>이메일</li>
-            <li>닉네임</li>
-            <li>비밀번호(암호화 저장)</li>
-            <li>운동 기록(사용자가 직접 입력한 정보)</li>
-          </ul>
-          <strong>이용 목적</strong>
-          <ul>
-            <li>회원 식별 및 로그인</li>
-            <li>운동 기록 저장 및 조회</li>
-            <li>서비스 운영 및 오류 대응</li>
-          </ul>
-          <strong>보관 기간</strong>
-          <ul>
-            <li>
-              회원 탈퇴 시까지 보관하며, 관련 법령에 따라 보관이 필요한 경우
-              해당 기간 동안 보관합니다.
-            </li>
-          </ul>
-          <p>
-            이용자는 개인정보 수집 및 이용에 대한 동의를 거부할 수 있으나,
-            동의하지 않을 경우 회원가입이 제한됩니다.
-          </p>
-        </div>
-        <button
-          className="cta secondary"
-          style={{ marginTop: 16 }}
-          onClick={onClose}
-        >
-          닫기
-        </button>
-      </div>
-    </div>
-  );
-}
+              {fieldErrors.fullName && 

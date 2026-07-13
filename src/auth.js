@@ -10,7 +10,7 @@ const ERROR_KO = {
 }
 function ko(msg) { return ERROR_KO[msg] || `오류: ${msg}` }
 
-const PENDING_PROFILE_KEY = 'absday.pendingProfile.v1'
+const PENDING_PROFILE_KEY = 'absolid.pendingProfile.v1'
 
 export async function signUp(email, password, nickname, fullName, phone) {
   const { data, error } = await supabase.auth.signUp({ email, password })
@@ -56,5 +56,4 @@ export async function saveNickname(nickname) {
   const { data } = await supabase.auth.getSession()
   const user = data.session?.user
   if (!user) return
-  await supabase.from('profiles').upsert({ id: user.id, nickname, updated_at: new Date().toISOString() })
-}
+  await supabase.from('profiles').upsert({ id: use
