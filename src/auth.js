@@ -56,4 +56,5 @@ export async function saveNickname(nickname) {
   const { data } = await supabase.auth.getSession()
   const user = data.session?.user
   if (!user) return
-  await supabase.from('profiles').upsert({ id: use
+  await supabase.from('profiles').upsert({ id: user.id, nickname })
+}

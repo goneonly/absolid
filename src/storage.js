@@ -83,4 +83,7 @@ export function mergeRecords(server) {
   if (!server) return
   const all = getRecords()
   for (const [k, v] of Object.entries(server)) {
-    all[k] = { ...v
+    all[k] = { ...v, ...(all[k]?.photo ? { photo: all[k].photo } : {}) }
+  }
+  localStorage.setItem(RECORDS_KEY, JSON.stringify(all))
+}

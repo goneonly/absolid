@@ -12,8 +12,8 @@ import { flushPendingProfile, signOut } from './auth.js'
 import { fetchServerRecords, syncLocalToServer, cleanupOldServerPhotos } from './api.js'
 import { fetchMyRole } from './admin.js'
 
-const CLEANUP_KEY = 'absolid.cleanup.v1'
-const ONBOARD_KEY = 'absolid.onboarding.v1'
+const CLEANUP_KEY = 'absday.cleanup.v1'
+const ONBOARD_KEY = 'absday.onboarding.v1'
 
 export default function App() {
   // view: home | workout | group | settings | admin
@@ -67,4 +67,41 @@ export default function App() {
         .then(() => localStorage.setItem(CLEANUP_KEY, todayKey()))
         .catch(() => {})
     }
-    return 
+    return () => { alive = false }
+  }, [session, refresh])
+
+  return (
+    <div className="app">
+      <header className="header">
+        <button className="logo" onClick={() => setView('home')} aria-label="홈으로">
+          <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+            <rect x="1" y="1" width="24" height="24" rx="7" fill="#ff3b30" />
+            <path d="M8 18 L13 7 L18 18" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            <path d="M10 14.5 H16" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" />
+          </svg>
+          <strong>Abs<em>Day</em></strong>
+        </button>
+        {session && <span className="tag">로그인됨</span>}
+      </header>
+
+      {view === 'home' && <Home records={records} onStart={() => setView('workout')} />}
+      {view === 'workout' && <Workout session={session} onDone={() => { refresh(); setView('home') }} />}
+      {view === 'group' && <Group records={records} session={session} />}
+      {view === 'settings' && <Settings session={session} onChanged={refresh} isAdmin={isAdmin} onOpenAdmin={() => setView('admin')} />}
+      {view === 'admin' && (isAdmin
+        ? <Admin onBack={() => setView('settings')} />
+        : <main className="page"><h2>관리자</h2><p className="sub">접근 권한이 없어요.</p></main>)}
+
+      {showOnboarding && (
+        <OnboardingModal
+          onClose={() => {
+            localStorage.setItem(ONBOARD_KEY, 'done')
+            setShowOnboarding(false)
+          }}
+        />
+      )}
+
+      <BottomNav view={view} onChange={setView} />
+    </div>
+  )
+}
