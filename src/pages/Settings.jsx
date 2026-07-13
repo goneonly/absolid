@@ -133,7 +133,7 @@ export default function Settings({ session, onChanged }) {
       </section>
 
       <p className="sub" style={{ marginTop: 16, textAlign: "center" }}>
-        AbsDay v1.0
+        AbsDay v{__APP_VERSION__}
       </p>
       <div className="footer-links">
         <a

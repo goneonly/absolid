@@ -1,3 +1,9 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-export default defineConfig({ plugins: [react()] })
+import pkg from './package.json'
+
+export default defineConfig({
+  plugins: [react()],
+  // package.json의 version을 앱 전역 상수로 주입 → 설정 화면에 자동 표시
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
+})
