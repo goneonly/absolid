@@ -160,8 +160,8 @@ export async function joinGroup(code, nickname) {
   if (!user_id) throw new Error('로그인이 필요해요.')
   const clean = (code || '').trim().toUpperCase()
   if (clean.length !== 6) throw new Error('초대 코드는 6자리예요.')
-  const { data: g } = await supabase
-    .from('groups').select('id, name, invite_code, max_members, members_only').eq('invite_code', clean).maybeSingle()
+  const { data: rows } = await supabase.rpc('find_group_by_invite_code', { code: clean })
+  const g = rows?.[0]
   if (!g) throw new Error('초대 코드를 찾을 수 없어요. 다시 확인해 주세요.')
 
   // 인원수 제한 확인
@@ -201,7 +201,7 @@ export async function fetchGroupStatus(groupId) {
   const sinceKey = since.toISOString().slice(0, 10)
   const todayStr = new Date().toISOString().slice(0, 10)
   const [{ data: profs }, { data: works }] = await Promise.all([
-    supabase.from('profiles').select('id, nickname, avatar_url').in('id', ids),
+    supabase.rpc('get_group_profiles', { gid: groupId }),
     supabase.from('workouts').select('user_id, date, photo_url').in('user_id', ids).gte('date', sinceKey),
   ])
   const names = Object.fromEntries((profs || []).map(p => [p.id, p.nickname]))

@@ -20,6 +20,11 @@
 같은 방법으로 **SQL Editor → New query**에 `supabase/storage.sql` 내용을 붙여넣고 **Run**.
 (인증샷 업로드용 공개 버킷과 보안 규칙이 만들어져요)
 
+## 2-2. 회원정보 보안 패치 (필수)
+**SQL Editor → New query**에 `supabase/profiles-security-fix.sql` 내용을 붙여넣고 **Run**.
+(기존 정책이 실명·전화번호·그룹 초대코드를 anon key만으로 전체 조회 가능하게 열어뒀던
+문제를 막습니다 — 이미 배포된 프로젝트라면 반드시 적용하세요)
+
 ## 3. 이메일 인증 끄기 (데모용, 선택)
 회원가입 시 메일 인증 없이 바로 로그인되게 하려면:
 1. **Authentication → Sign In / Providers → Email**
