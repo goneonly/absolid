@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { loadYouTubeAPI, PLAYLIST_ID } from "../youtube.js";
+import { loadYouTubeAPI } from "../youtube.js";
+import { getPlaylistId } from "../admin.js";
 import { todayWorkoutDay, todayKey, saveRecord } from "../storage.js";
 import CompleteModal from "../components/CompleteModal.jsx";
 import { pushRecord, uploadPhoto } from "../api.js";
@@ -18,7 +19,8 @@ export default function Workout({ onDone, session }) {
 
   useEffect(() => {
     let cancelled = false;
-    loadYouTubeAPI().then((YT) => {
+    // 관리자가 설정한 플레이리스트를 우선 사용 (없으면 기본값)
+    Promise.all([getPlaylistId(), loadYouTubeAPI()]).then(([playlistId, YT]) => {
       if (cancelled || !holderRef.current) return;
       playerRef.current = new YT.Player(holderRef.current, {
         width: "100%",
@@ -29,7 +31,7 @@ export default function Workout({ onDone, session }) {
             // 플레이리스트의 (day-1)번째 영상 = 오늘의 Day 영상
             e.target.cuePlaylist({
               listType: "playlist",
-              list: PLAYLIST_ID,
+              list: playlistId,
               index: day - 1,
             });
           },

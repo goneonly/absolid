@@ -3,24 +3,54 @@ import Home from './pages/Home.jsx'
 import Workout from './pages/Workout.jsx'
 import Group from './pages/Group.jsx'
 import Settings from './pages/Settings.jsx'
+import Admin from './pages/Admin.jsx'
 import BottomNav from './components/BottomNav.jsx'
+import OnboardingModal from './components/OnboardingModal.jsx'
 import { getRecords, mergeRecords, cleanupLocalPhotos, todayKey } from './storage.js'
 import { useAuth } from './useAuth.js'
-import { flushPendingProfile } from './auth.js'
+import { flushPendingProfile, signOut } from './auth.js'
 import { fetchServerRecords, syncLocalToServer, cleanupOldServerPhotos } from './api.js'
+import { fetchMyRole } from './admin.js'
 
 const CLEANUP_KEY = 'absday.cleanup.v1'
+const ONBOARD_KEY = 'absday.onboarding.v1'
 
 export default function App() {
-  // view: home | workout | group | settings
+  // view: home | workout | group | settings | admin
   const [view, setView] = useState('home')
   const [, setTick] = useState(0)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(false)
   const refresh = useCallback(() => setTick(t => t + 1), [])
   const session = useAuth()
   const records = getRecords()
 
   // 앱 시작 시: 7일 지난 로컬 인증샷 정리 (localStorage 용량 보호)
   useEffect(() => { cleanupLocalPhotos(7) }, [])
+
+  // 가입 완료 후 첫 진입: 홈으로 이동 + 기능 소개 팝업 1회
+  useEffect(() => {
+    if (session && localStorage.getItem(ONBOARD_KEY) === 'pending') {
+      setView('home')
+      setShowOnboarding(true)
+    }
+  }, [session])
+
+  // 로그인 시: 역할 확인 (관리자 메뉴 노출) + 비활성 계정 차단
+  useEffect(() => {
+    if (!session) { setIsAdmin(false); return }
+    let alive = true
+    fetchMyRole().then(({ role, isActive }) => {
+      if (!alive) return
+      if (!isActive) {
+        alert('이용이 제한된 계정이에요. 문의가 필요하면 관리자에게 연락해 주세요.')
+        signOut()
+        return
+      }
+      setIsAdmin(role === 'admin')
+    }).catch(() => {})
+    return () => { alive = false }
+  }, [session])
 
   // 로그인되면: 서버 기록 내려받아 병합 + 비회원 시절 로컬 기록 서버로 업로드
   // + 하루 1회, 30일 지난 내 서버 인증샷 정리
@@ -57,7 +87,19 @@ export default function App() {
       {view === 'home' && <Home records={records} onStart={() => setView('workout')} />}
       {view === 'workout' && <Workout session={session} onDone={() => { refresh(); setView('home') }} />}
       {view === 'group' && <Group records={records} session={session} />}
-      {view === 'settings' && <Settings session={session} onChanged={refresh} />}
+      {view === 'settings' && <Settings session={session} onChanged={refresh} isAdmin={isAdmin} onOpenAdmin={() => setView('admin')} />}
+      {view === 'admin' && (isAdmin
+        ? <Admin onBack={() => setView('settings')} />
+        : <main className="page"><h2>관리자</h2><p className="sub">접근 권한이 없어요.</p></main>)}
+
+      {showOnboarding && (
+        <OnboardingModal
+          onClose={() => {
+            localStorage.setItem(ONBOARD_KEY, 'done')
+            setShowOnboarding(false)
+          }}
+        />
+      )}
 
       <BottomNav view={view} onChange={setView} />
     </div>

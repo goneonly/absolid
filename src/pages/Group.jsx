@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback } from 'react'
 import { todayKey, lastNDays, getProfile } from '../storage.js'
 import { supabase } from '../supabase.js'
 import { fetchMyGroup, createGroup, joinGroup, leaveGroup, fetchGroupStatus } from '../api.js'
+import { submitReport } from '../admin.js'
+import { toast } from '../toast.js'
 
 const WEEK = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -89,6 +91,15 @@ export default function Group({ records, session }) {
     await leaveGroup(group.id)
     setGroup(null); setMembers([]); setPhotos([])
     setBusy(false)
+  }
+
+  async function reportPhoto(p) {
+    const reason = prompt(`${p.name}의 인증샷을 신고할까요?\n사유를 입력해 주세요. (선택)`)
+    if (reason === null) return // 취소
+    try {
+      await submitReport(p.id, todayKey(), reason)
+      toast('신고가 접수됐어요. 관리자가 확인 후 처리할게요.')
+    } catch (e) { toast(e.message) }
   }
 
   function copyCode() {
@@ -223,7 +234,14 @@ export default function Group({ records, session }) {
             {todayPhotos.map(p => (
               <figure key={p.id}>
                 <img className="ph" src={p.url} alt={`${p.name}의 오늘 인증샷`} loading="lazy" />
-                <figcaption>{p.id === myId ? (myName || p.name) : p.name}</figcaption>
+                <figcaption>
+                  {p.id === myId ? (myName || p.name) : p.name}
+                  {p.id !== myId && (
+                    <button className="report-link" onClick={() => reportPhoto(p)} aria-label="이 사진 신고">
+                      신고
+                    </button>
+                  )}
+                </figcaption>
               </figure>
             ))}
           </div>

@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react'
 import { computeStreak, lastNDays, todayKey, todayWorkoutDay } from '../storage.js'
+import { fetchActiveAnnouncement } from '../admin.js'
 
 const DOW = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -7,9 +9,15 @@ export default function Home({ records, onStart }) {
   const doneToday = !!records[todayKey()]?.completed
   const week = lastNDays(7, records)
   const day = todayWorkoutDay()
+  const [notice, setNotice] = useState(null)
+
+  useEffect(() => {
+    fetchActiveAnnouncement().then(setNotice)
+  }, [])
 
   return (
     <main className="page">
+      {notice && <div className="banner">📢 {notice.message}</div>}
       <h2>오늘도 복근 챙기기 🔥</h2>
       <p className="sub">Day {day} 운동이 준비되어 있어요.</p>
 
