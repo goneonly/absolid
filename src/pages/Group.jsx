@@ -93,11 +93,20 @@ export default function Group({ records, session }) {
         <section className="card">
           <MemberRow name={myName} isMe dates={myDates} />
         </section>
-        <section className="card">
-          <div style={{ fontWeight: 700, fontSize: 15 }}>그룹은 로그인 후 이용할 수 있어요</div>
-          <p className="sub" style={{ marginTop: 6 }}>
-            설정 탭에서 로그인/회원가입을 하면 초대 코드로 친구들과 함께할 수 있어요.
-          </p>
+        <section className="card locked-card">
+          <div className="lock-bg" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="4.5" y="10.5" width="15" height="10" rx="2.5" />
+              <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
+              <circle cx="12" cy="15.5" r="1.4" fill="currentColor" stroke="none" />
+            </svg>
+          </div>
+          <div className="locked-text">
+            <strong>그룹은 로그인 후 이용할 수 있어요</strong>
+            <p className="sub" style={{ marginTop: 8 }}>
+              설정 탭에서 로그인/회원가입을 하면<br />초대 코드로 친구들과 함께할 수 있어요.
+            </p>
+          </div>
         </section>
       </main>
     )

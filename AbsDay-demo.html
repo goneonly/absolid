@@ -120,6 +120,20 @@ input { font-family: inherit; }
 .input:focus { outline: none; border-color: var(--red); }
 .linklike { background: none; border: none; color: var(--text-dim); font-size: 12px; cursor: pointer; }
 .linklike strong { color: var(--red); font-size: 13px; }
+
+/* ── 그룹 잠금 카드 (미로그인) ── */
+.locked-card {
+  position: relative; overflow: hidden; text-align: center;
+  background: rgba(255, 59, 48, .15); border-color: rgba(255, 59, 48, .3);
+  padding: 34px 20px;
+}
+.locked-card .lock-bg {
+  position: absolute; inset: 0; display: flex;
+  align-items: center; justify-content: center; pointer-events: none;
+}
+.locked-card .lock-bg svg { width: 84px; height: 84px; color: var(--gray-dot); opacity: .55; }
+.locked-card .locked-text { position: relative; z-index: 1; }
+.locked-card .locked-text strong { font-size: 15px; }
 .row-btn {
   width: 100%; display: flex; align-items: center; justify-content: space-between;
   padding: 16px 0; border-bottom: 1px solid var(--border); font-size: 15px;
@@ -314,11 +328,16 @@ const ERROR_KO = {
 }
 function ko(msg) { return ERROR_KO[msg] || `오류: ${msg}` }
 
-async function signUp(email, password, nickname) {
+async function signUp(email, password, nickname, fullName, phone) {
   const { data, error } = await supabase.auth.signUp({ email, password })
   if (error) return { error: ko(error.message) }
   if (data.user) {
-    await supabase.from('profiles').upsert({ id: data.user.id, nickname: nickname || '' })
+    await supabase.from('profiles').upsert({
+      id: data.user.id,
+      nickname: nickname || fullName || '',
+      full_name: fullName || '',
+      phone: phone || '',
+    })
   }
   return { data }
 }
@@ -710,11 +729,20 @@ function Group({ records, session }) {
         <section className="card">
           <MemberRow name={myName} isMe dates={myDates} />
         </section>
-        <section className="card">
-          <div style={{ fontWeight: 700, fontSize: 15 }}>그룹은 로그인 후 이용할 수 있어요</div>
-          <p className="sub" style={{ marginTop: 6 }}>
-            설정 탭에서 로그인/회원가입을 하면 초대 코드로 친구들과 함께할 수 있어요.
-          </p>
+        <section className="card locked-card">
+          <div className="lock-bg" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="4.5" y="10.5" width="15" height="10" rx="2.5" />
+              <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
+              <circle cx="12" cy="15.5" r="1.4" fill="currentColor" stroke="none" />
+            </svg>
+          </div>
+          <div className="locked-text">
+            <strong>그룹은 로그인 후 이용할 수 있어요</strong>
+            <p className="sub" style={{ marginTop: 8 }}>
+              설정 탭에서 로그인/회원가입을 하면<br />초대 코드로 친구들과 함께할 수 있어요.
+            </p>
+          </div>
         </section>
       </main>
     )
@@ -960,6 +988,8 @@ function AccountCard({ session, nickname }) {
   const [mode, setMode] = useState('signin') // signin | signup
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [fullName, setFullName] = useState('')
+  const [phone, setPhone] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
@@ -992,7 +1022,9 @@ function AccountCard({ session, nickname }) {
   async function submit(e) {
     e.preventDefault()
     setError(''); setNotice(''); setBusy(true)
-    const fn = mode === 'signup' ? () => signUp(email, password, nickname) : () => signIn(email, password)
+    const fn = mode === 'signup'
+      ? () => signUp(email, password, nickname, fullName.trim(), phone.trim())
+      : () => signIn(email, password)
     const res = await fn()
     setBusy(false)
     if (res?.error) { setError(res.error); return }
@@ -1010,6 +1042,21 @@ function AccountCard({ session, nickname }) {
         회원이 되면 기록이 계정에 저장되고, 그룹 만들기·사진 업로드를 쓸 수 있어요.
       </p>
       <form onSubmit={submit}>
+        {mode === 'signup' && (
+          <>
+            <div className="field">
+              <label htmlFor="name">이름</label>
+              <input id="name" required value={fullName} maxLength={20}
+                autoComplete="name" onChange={e => setFullName(e.target.value)} />
+            </div>
+            <div className="field">
+              <label htmlFor="phone">전화번호</label>
+              <input id="phone" type="tel" required value={phone} maxLength={13}
+                placeholder="010-0000-0000" autoComplete="tel"
+                onChange={e => setPhone(e.target.value)} />
+            </div>
+          </>
+        )}
         <div className="field">
           <label htmlFor="email">이메일</label>
           <input id="email" type="email" required value={email}
@@ -1029,7 +1076,7 @@ function AccountCard({ session, nickname }) {
       </form>
       <button className="cta secondary" style={{ marginTop: 10 }}
         onClick={() => { setMode(mode === 'signup' ? 'signin' : 'signup'); setError(''); setNotice('') }}>
-        {mode === 'signup' ? '이미 계정이 있어요 → 로그인' : '처음이에요 → 회원가입'}
+        {mode === 'signup' ? '이미 계정이 있어요 → 로그인' : '회원가입'}
       </button>
     </section>
   )

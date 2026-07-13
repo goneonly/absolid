@@ -75,6 +75,8 @@ function AccountCard({ session, nickname }) {
   const [mode, setMode] = useState('signin') // signin | signup
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [fullName, setFullName] = useState('')
+  const [phone, setPhone] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
@@ -107,7 +109,9 @@ function AccountCard({ session, nickname }) {
   async function submit(e) {
     e.preventDefault()
     setError(''); setNotice(''); setBusy(true)
-    const fn = mode === 'signup' ? () => signUp(email, password, nickname) : () => signIn(email, password)
+    const fn = mode === 'signup'
+      ? () => signUp(email, password, nickname, fullName.trim(), phone.trim())
+      : () => signIn(email, password)
     const res = await fn()
     setBusy(false)
     if (res?.error) { setError(res.error); return }
@@ -125,6 +129,21 @@ function AccountCard({ session, nickname }) {
         회원이 되면 기록이 계정에 저장되고, 그룹 만들기·사진 업로드를 쓸 수 있어요.
       </p>
       <form onSubmit={submit}>
+        {mode === 'signup' && (
+          <>
+            <div className="field">
+              <label htmlFor="name">이름</label>
+              <input id="name" required value={fullName} maxLength={20}
+                autoComplete="name" onChange={e => setFullName(e.target.value)} />
+            </div>
+            <div className="field">
+              <label htmlFor="phone">전화번호</label>
+              <input id="phone" type="tel" required value={phone} maxLength={13}
+                placeholder="010-0000-0000" autoComplete="tel"
+                onChange={e => setPhone(e.target.value)} />
+            </div>
+          </>
+        )}
         <div className="field">
           <label htmlFor="email">이메일</label>
           <input id="email" type="email" required value={email}
@@ -144,7 +163,7 @@ function AccountCard({ session, nickname }) {
       </form>
       <button className="cta secondary" style={{ marginTop: 10 }}
         onClick={() => { setMode(mode === 'signup' ? 'signin' : 'signup'); setError(''); setNotice('') }}>
-        {mode === 'signup' ? '이미 계정이 있어요 → 로그인' : '처음이에요 → 회원가입'}
+        {mode === 'signup' ? '이미 계정이 있어요 → 로그인' : '회원가입'}
       </button>
     </section>
   )

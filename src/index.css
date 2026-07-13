@@ -111,6 +111,20 @@ input { font-family: inherit; }
 .input:focus { outline: none; border-color: var(--red); }
 .linklike { background: none; border: none; color: var(--text-dim); font-size: 12px; cursor: pointer; }
 .linklike strong { color: var(--red); font-size: 13px; }
+
+/* ── 그룹 잠금 카드 (미로그인) ── */
+.locked-card {
+  position: relative; overflow: hidden; text-align: center;
+  background: rgba(255, 59, 48, .15); border-color: rgba(255, 59, 48, .3);
+  padding: 34px 20px;
+}
+.locked-card .lock-bg {
+  position: absolute; inset: 0; display: flex;
+  align-items: center; justify-content: center; pointer-events: none;
+}
+.locked-card .lock-bg svg { width: 84px; height: 84px; color: var(--gray-dot); opacity: .55; }
+.locked-card .locked-text { position: relative; z-index: 1; }
+.locked-card .locked-text strong { font-size: 15px; }
 .row-btn {
   width: 100%; display: flex; align-items: center; justify-content: space-between;
   padding: 16px 0; border-bottom: 1px solid var(--border); font-size: 15px;

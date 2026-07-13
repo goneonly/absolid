@@ -10,11 +10,16 @@ const ERROR_KO = {
 }
 function ko(msg) { return ERROR_KO[msg] || `오류: ${msg}` }
 
-export async function signUp(email, password, nickname) {
+export async function signUp(email, password, nickname, fullName, phone) {
   const { data, error } = await supabase.auth.signUp({ email, password })
   if (error) return { error: ko(error.message) }
   if (data.user) {
-    await supabase.from('profiles').upsert({ id: data.user.id, nickname: nickname || '' })
+    await supabase.from('profiles').upsert({
+      id: data.user.id,
+      nickname: nickname || fullName || '',
+      full_name: fullName || '',
+      phone: phone || '',
+    })
   }
   return { data }
 }
