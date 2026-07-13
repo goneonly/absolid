@@ -84,6 +84,17 @@ input { font-family: inherit; }
 .workout-note { margin-top: 16px; }
 .demo-link { display: block; margin: 20px auto 0; color: var(--text-dim); font-size: 12px; text-decoration: underline; }
 
+/* ── 토스트 알림 ── */
+.toast {
+  position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%) translateY(8px);
+  max-width: min(440px, calc(100vw - 40px));
+  background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
+  border-radius: 12px; padding: 12px 16px; font-size: 13px; line-height: 1.4;
+  box-shadow: 0 8px 24px rgba(0,0,0,.4); z-index: 200;
+  opacity: 0; transition: opacity .25s ease, transform .25s ease;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
 /* ── Group ── */
 .member { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
 .member:last-child { border-bottom: none; }
@@ -273,8 +284,9 @@ input { font-family: inherit; }
 .modal h3 { font-size: 20px; font-weight: 800; text-align: center; }
 .modal .sub { text-align: center; margin-top: 6px; }
 .photo-box {
-  margin-top: 18px; border: 1.5px dashed var(--border); border-radius: 14px;
-  min-height: 140px; display: flex; align-items: center; justify-content: center;
-  color: var(--text-dim); font-size: 14px; overflow: hidden; background: var(--surface-2);
+  width: 100%; margin-top: 18px; border: 1.5px dashed var(--border); border-radius: 14px;
+  min-height: 200px; display: flex; align-items: center; justify-content: center;
+  text-align: center; color: var(--text-dim); font-size: 17px; font-weight: 600;
+  overflow: hidden; background: var(--surface-2);
 }
 .photo-box img { width: 100%; display: block; }

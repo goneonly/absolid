@@ -55,7 +55,7 @@ export default function App() {
       </header>
 
       {view === 'home' && <Home records={records} onStart={() => setView('workout')} />}
-      {view === 'workout' && <Workout onDone={() => { refresh(); setView('home') }} />}
+      {view === 'workout' && <Workout session={session} onDone={() => { refresh(); setView('home') }} />}
       {view === 'group' && <Group records={records} session={session} />}
       {view === 'settings' && <Settings session={session} onChanged={refresh} />}
 

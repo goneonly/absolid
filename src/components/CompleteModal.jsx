@@ -37,7 +37,7 @@ export default function CompleteModal({ day, onSave, onSkip }) {
         <p className="sub">오늘의 인증샷을 남겨볼까요? (선택)</p>
 
         <button className="photo-box" onClick={() => fileRef.current?.click()}>
-          {photo ? <img src={photo} alt="인증샷 미리보기" /> : '탭해서 사진 첨부하기 📷'}
+          {photo ? <img src={photo} alt="인증샷 미리보기" /> : '📷 탭하여 사진 첨부'}
         </button>
         <input ref={fileRef} type="file" accept="image/*" hidden onChange={handleFile} />
 

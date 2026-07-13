@@ -9,6 +9,7 @@ import {
 import { supabase } from "../supabase.js";
 import { signUp, signIn, signOut, saveNickname } from "../auth.js";
 import { uploadAvatar, deleteAvatar } from "../api.js";
+import { toast } from "../toast.js";
 import {
   validateEmail,
   validateName,
@@ -218,7 +219,12 @@ function ProfilePhoto({ nickname, session, onChanged }) {
       const dataUrl = await compressImage(file);
       saveProfile({ ...getProfile(), avatar: dataUrl });
       setAvatar(dataUrl);
-      if (session) await uploadAvatar(dataUrl); // 로그인 시 서버에도 저장
+      if (session) {
+        // 로그인 시 서버에도 저장 — 실패하면 안내 (사진은 이 기기에는 남음)
+        const url = await uploadAvatar(dataUrl);
+        if (!url)
+          toast("서버 업로드에 실패했어요. 사진은 이 기기에서만 보여요.");
+      }
       onChanged();
     } catch {
       alert("사진을 불러오지 못했어요. 다른 사진으로 시도해 주세요.");

@@ -3,13 +3,17 @@ import { loadYouTubeAPI, PLAYLIST_ID } from "../youtube.js";
 import { todayWorkoutDay, todayKey, saveRecord } from "../storage.js";
 import CompleteModal from "../components/CompleteModal.jsx";
 import { pushRecord, uploadPhoto } from "../api.js";
+import { toast } from "../toast.js";
 
-export default function Workout({ onDone }) {
+const FINISH_RATIO = 0.8; // 영상 80% 이상 시청 시 수동 완료 버튼 활성화
+
+export default function Workout({ onDone, session }) {
   const holderRef = useRef(null);
   const playerRef = useRef(null);
   const startedRef = useRef(false);
   const finishedRef = useRef(false);
   const [showModal, setShowModal] = useState(false);
+  const [canFinish, setCanFinish] = useState(false);
   const day = todayWorkoutDay();
 
   useEffect(() => {
@@ -47,8 +51,25 @@ export default function Workout({ onDone }) {
         },
       });
     });
+
+    // 자동 판정 백업: 시청률 80% 도달 시 수동 완료 버튼 활성화
+    const timer = setInterval(() => {
+      const p = playerRef.current;
+      if (!p?.getCurrentTime || !p?.getDuration) return;
+      try {
+        const dur = p.getDuration();
+        if (dur > 0 && p.getCurrentTime() / dur >= FINISH_RATIO) {
+          setCanFinish(true);
+          clearInterval(timer);
+        }
+      } catch {
+        /* 플레이어 준비 전엔 무시 */
+      }
+    }, 3000);
+
     return () => {
       cancelled = true;
+      clearInterval(timer);
       try {
         playerRef.current?.destroy();
       } catch {
@@ -66,10 +87,19 @@ export default function Workout({ onDone }) {
 
   function handleSave(photo) {
     const completedAt = new Date().toISOString();
-    // 로그인 상태면 서버에도 저장 + 인증샷 업로드 (Day 5)
+    // 로컬 저장은 즉시, 서버 저장·업로드는 백그라운드로 (실패 시 토스트 안내)
     pushRecord(todayKey(), day, completedAt)
       .then(() => uploadPhoto(todayKey(), photo))
-      .catch(() => {});
+      .then((url) => {
+        if (session && photo && !url) {
+          toast("인증샷 서버 업로드에 실패했어요. 사진은 이 기기에만 저장돼요.");
+        }
+      })
+      .catch(() => {
+        if (session) {
+          toast("서버 저장에 실패했어요. 다음 접속 때 자동으로 다시 동기화돼요.");
+        }
+      });
     saveRecord(todayKey(), {
       completed: true,
       completedAt,
@@ -99,9 +129,17 @@ export default function Workout({ onDone }) {
         </p>
       </section>
 
-      <button className="demo-link" onClick={finish}>
-        (데모용) 영상 끝까지 본 것으로 처리하기
-      </button>
+      {canFinish && (
+        <button className="cta" onClick={finish}>
+          운동 완료
+        </button>
+      )}
+
+      {import.meta.env.DEV && (
+        <button className="demo-link" onClick={finish}>
+          (개발용) 영상 끝까지 본 것으로 처리하기
+        </button>
+      )}
 
       <p className="copyright"> © XYZ Fitness - 30 days six pack abs</p>
 
