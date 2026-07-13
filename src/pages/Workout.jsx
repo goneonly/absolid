@@ -87,7 +87,6 @@ export default function Workout({ onDone }) {
       <section className="card workout-note">
         <div style={{ fontWeight: 700, fontSize: 15 }}>오늘의 루틴</div>
         <p className="sub" style={{ marginTop: 6 }}>
-          XYZ FITNESS · 30 Days Six Pack Abs 프로그램의 Day {day} 영상입니다.
           중간에 나가면 완료로 기록되지 않아요. 끝까지 함께해요! 💪
         </p>
       </section>
@@ -95,6 +94,8 @@ export default function Workout({ onDone }) {
       <button className="demo-link" onClick={finish}>
         (데모용) 영상 끝까지 본 것으로 처리하기
       </button>
+
+      <p className="copyright">XYZ Fitness - 30 days six pack abs</p>
 
       {showModal && (
         <CompleteModal

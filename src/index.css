@@ -87,14 +87,76 @@ input { font-family: inherit; }
 /* ── Group ── */
 .member { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
 .member:last-child { border-bottom: none; }
-.member .status { width: 12px; height: 12px; border-radius: 50%; background: var(--gray-dot); flex: none; }
-.member .status.done { background: var(--red); }
+.member-avatar {
+  width: 30px; height: 30px; border-radius: 50%; flex: none;
+  background: var(--surface-2); border: 2px solid var(--gray-dot);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--gray-dot); overflow: hidden;
+}
+.member-avatar.done { border-color: var(--red); }
+.member-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.member-avatar svg { width: 16px; height: 16px; }
 .member .name { font-size: 15px; font-weight: 600; flex: 1; }
 .member .state-label { font-size: 12px; color: var(--text-dim); }
 .member .state-label.done { color: var(--red); font-weight: 600; }
 .legend { display: flex; gap: 16px; margin-top: 12px; font-size: 12px; color: var(--text-dim); align-items: center; }
 .legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; }
 .tag { display: inline-block; font-size: 11px; font-weight: 700; color: var(--text-dim); background: var(--surface-2); border-radius: 6px; padding: 3px 8px; margin-left: 8px; vertical-align: middle; }
+
+/* ── 오늘의 인증샷 그리드 (고정 사이즈, 많아지면 스크롤) ── */
+.photo-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  margin-top: 14px; max-height: 348px; overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.photo-grid figure { margin: 0; }
+.photo-grid .ph {
+  width: 100%; aspect-ratio: 1; object-fit: cover; display: block;
+  border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border);
+}
+.photo-grid figcaption {
+  font-size: 11px; color: var(--text-dim); text-align: center; margin-top: 4px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ── 그룹 하단 (새로고침 / 나가기) ── */
+.group-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 14px; padding: 0 4px;
+}
+.icon-btn {
+  width: 34px; height: 34px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-dim); background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.icon-btn svg { width: 16px; height: 16px; }
+.icon-btn:active { transform: scale(.94); }
+.icon-btn:disabled { opacity: .5; cursor: default; }
+.leave-btn {
+  font-size: 12px; color: var(--text-dim); text-decoration: underline;
+  padding: 8px 4px;
+}
+.leave-btn:disabled { opacity: .5; cursor: default; }
+
+/* ── 그룹 생성 옵션 ── */
+.group-options { margin-top: 12px; border-top: 1px solid var(--border); }
+.option-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+.option-row:last-child { border-bottom: none; }
+.option-row label { color: var(--text); }
+.option-row.checkbox { cursor: pointer; }
+.option-row.checkbox span { display: flex; flex-direction: column; gap: 3px; }
+.option-row.checkbox small { font-size: 11px; color: var(--text-dim); }
+.option-row.checkbox input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--red); flex: none; }
+.option-select {
+  background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
+  border-radius: 10px; padding: 8px 12px; font-size: 14px; font-family: inherit;
+}
+.option-select:focus { outline: none; border-color: var(--red); }
 
 /* ── Settings ── */
 .field { margin-top: 14px; }
@@ -111,6 +173,47 @@ input { font-family: inherit; }
 .input:focus { outline: none; border-color: var(--red); }
 .linklike { background: none; border: none; color: var(--text-dim); font-size: 12px; cursor: pointer; }
 .linklike strong { color: var(--red); font-size: 13px; }
+
+.field-error { color: var(--red); font-size: 12px; margin-top: 6px; line-height: 1.4; }
+.field input[aria-invalid="true"] { border-color: var(--red); }
+
+/* ── 프로필 사진 (LinkedIn 스타일) ── */
+.profile-hero { display: flex; flex-direction: column; align-items: center; padding-top: 6px; }
+.avatar {
+  position: relative; width: 96px; height: 96px; border-radius: 50%;
+  background: var(--surface-2); border: 2px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--gray-dot); overflow: visible; padding: 0;
+}
+.avatar:disabled { opacity: .6; cursor: default; }
+.avatar img {
+  width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block;
+}
+.avatar > svg { width: 48px; height: 48px; }
+.avatar-badge {
+  position: absolute; right: -2px; bottom: -2px;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--red); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  border: 3px solid var(--surface);
+}
+.avatar-badge svg { width: 14px; height: 14px; }
+.profile-name { font-size: 16px; font-weight: 700; margin-top: 12px; }
+.profile-email { font-size: 12px; color: var(--text-dim); margin-top: 3px; }
+
+/* ── 설정 하단 링크 ── */
+.footer-links {
+  display: flex; justify-content: center; align-items: center; gap: 10px;
+  margin-top: 8px; font-size: 12px; color: var(--text-dim);
+}
+.footer-links a { color: var(--text-dim); text-decoration: none; }
+.footer-links a:hover { text-decoration: underline; color: var(--text); }
+
+/* ── Copyright ── */
+.copyright {
+  text-align: center; font-size: 11px; color: var(--text-dim);
+  opacity: .8; margin-top: 24px;
+}
 
 /* ── 그룹 잠금 카드 (미로그인) ── */
 .locked-card {

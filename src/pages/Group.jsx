@@ -5,12 +5,20 @@ import { fetchMyGroup, createGroup, joinGroup, leaveGroup, fetchGroupStatus } fr
 
 const WEEK = ['일', '월', '화', '수', '목', '금', '토']
 
-function MemberRow({ name, isMe, dates }) {
+function MemberRow({ name, isMe, dates, avatar }) {
   const days = lastNDays(7, {})
   const doneToday = dates.has(todayKey())
   return (
     <div className="member" style={{ alignItems: 'flex-start' }}>
-      <span className={'status' + (doneToday ? ' done' : '')} style={{ marginTop: 4 }} />
+      <span className={'member-avatar' + (doneToday ? ' done' : '')} style={{ marginTop: 2 }}>
+        {avatar ? (
+          <img src={avatar} alt={`${name} 프로필 사진`} loading="lazy" />
+        ) : (
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Zm0 2c-4.2 0-8 2.2-8 5.4V21h16v-1.6c0-3.2-3.8-5.4-8-5.4Z" />
+          </svg>
+        )}
+      </span>
       <div style={{ flex: 1 }}>
         <span className="name">{name}{isMe ? ' (나)' : ''}</span>
         <div style={{ display: 'flex', gap: 5, marginTop: 6 }}>
@@ -33,9 +41,12 @@ function MemberRow({ name, isMe, dates }) {
 export default function Group({ records, session }) {
   const [group, setGroup] = useState(null)
   const [members, setMembers] = useState([])
+  const [photos, setPhotos] = useState([])
   const [loading, setLoading] = useState(true)
   const [mode, setMode] = useState('join') // join | create
   const [input, setInput] = useState('')
+  const [maxMembers, setMaxMembers] = useState(10)
+  const [membersOnly, setMembersOnly] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
@@ -46,7 +57,11 @@ export default function Group({ records, session }) {
     try {
       const g = await fetchMyGroup()
       setGroup(g)
-      if (g) setMembers(await fetchGroupStatus(g.id))
+      if (g) {
+        const { members, photos } = await fetchGroupStatus(g.id)
+        setMembers(members)
+        setPhotos(photos)
+      }
     } catch { /* 네트워크 오류 시 조용히 패스 */ }
     setLoading(false)
   }, [session])
@@ -57,8 +72,11 @@ export default function Group({ records, session }) {
     setError(''); setBusy(true)
     try {
       const nickname = getProfile().nickname
-      if (mode === 'create') await createGroup(input.trim() || '우리 복근단', nickname)
-      else await joinGroup(input, nickname)
+      if (mode === 'create') {
+        await createGroup(input.trim() || '우리 복근단', nickname, { maxMembers, membersOnly })
+      } else {
+        await joinGroup(input, nickname)
+      }
       setInput('')
       await load()
     } catch (e) { setError(e.message) }
@@ -69,7 +87,7 @@ export default function Group({ records, session }) {
     if (!confirm('그룹에서 나갈까요? 내 운동 기록은 사라지지 않아요.')) return
     setBusy(true)
     await leaveGroup(group.id)
-    setGroup(null); setMembers([])
+    setGroup(null); setMembers([]); setPhotos([])
     setBusy(false)
   }
 
@@ -84,12 +102,18 @@ export default function Group({ records, session }) {
   const myName = getProfile().nickname || '나'
   const myId = session?.user?.id
 
+  // 오늘의 인증샷: 서버 사진 + (서버에 아직 없으면) 내 로컬 사진 보충
+  const myLocalPhoto = records[todayKey()]?.photo
+  const todayPhotos = [...photos]
+  if (myId && myLocalPhoto && !todayPhotos.some(p => p.id === myId)) {
+    todayPhotos.unshift({ id: myId, name: myName, url: myLocalPhoto })
+  }
+
   // ── 미로그인/서버 미연결 ──
   if (!supabase || !session) {
     return (
       <main className="page">
         <h2>그룹</h2>
-        <p className="sub">오늘 운동한 멤버는 레드, 아직인 멤버는 그레이로 표시돼요.</p>
         <section className="card">
           <MemberRow name={myName} isMe dates={myDates} />
         </section>
@@ -133,6 +157,27 @@ export default function Group({ records, session }) {
             maxLength={mode === 'join' ? 6 : 20}
             style={mode === 'join' ? { textTransform: 'uppercase', letterSpacing: 2 } : undefined}
           />
+          {mode === 'create' && (
+            <div className="group-options">
+              <div className="option-row">
+                <label htmlFor="max-members">인원수 제한</label>
+                <select id="max-members" className="option-select" value={maxMembers}
+                  onChange={e => setMaxMembers(Number(e.target.value))}>
+                  {[2, 3, 4, 5, 6, 8, 10, 15, 20, 30, 50].map(n => (
+                    <option key={n} value={n}>{n}명</option>
+                  ))}
+                </select>
+              </div>
+              <label className="option-row checkbox">
+                <span>
+                  회원만 받기
+                  <small>이름·전화번호를 등록한 회원만 참여할 수 있어요</small>
+                </span>
+                <input type="checkbox" checked={membersOnly}
+                  onChange={e => setMembersOnly(e.target.checked)} />
+              </label>
+            </div>
+          )}
           {error && <p className="sub" style={{ color: 'var(--red)', marginTop: 8 }}>{error}</p>}
           <button className="cta" onClick={submit} disabled={busy || !input.trim()} style={{ marginTop: 12 }}>
             {busy ? '처리 중…' : mode === 'join' ? '참여하기' : '만들기'}
@@ -146,7 +191,6 @@ export default function Group({ records, session }) {
   return (
     <main className="page">
       <h2>그룹</h2>
-      <p className="sub">오늘 운동한 멤버는 레드, 아직인 멤버는 그레이로 표시돼요.</p>
 
       <section className="card">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -161,6 +205,7 @@ export default function Group({ records, session }) {
               key={m.id}
               name={m.id === myId ? (myName || m.name) : m.name}
               isMe={m.id === myId}
+              avatar={m.id === myId ? (getProfile().avatar || m.avatar) : m.avatar}
               dates={m.id === myId ? new Set([...m.dates, ...myDates]) : m.dates}
             />
           ))}
@@ -171,10 +216,31 @@ export default function Group({ records, session }) {
         </div>
       </section>
 
-      <section className="card" style={{ display: 'flex', gap: 8 }}>
-        <button className="cta secondary" style={{ flex: 1 }} onClick={load} disabled={busy}>새로고침</button>
-        <button className="cta secondary" style={{ flex: 1, color: 'var(--red)' }} onClick={onLeave} disabled={busy}>그룹 나가기</button>
+      <section className="card">
+        <div style={{ fontWeight: 700, fontSize: 15 }}>오늘의 인증샷 📷</div>
+        {todayPhotos.length ? (
+          <div className="photo-grid">
+            {todayPhotos.map(p => (
+              <figure key={p.id}>
+                <img className="ph" src={p.url} alt={`${p.name}의 오늘 인증샷`} loading="lazy" />
+                <figcaption>{p.id === myId ? (myName || p.name) : p.name}</figcaption>
+              </figure>
+            ))}
+          </div>
+        ) : (
+          <p className="sub" style={{ marginTop: 6 }}>아직 오늘 올라온 인증샷이 없어요. 첫 인증샷의 주인공이 되어 보세요!</p>
+        )}
       </section>
+
+      <div className="group-footer">
+        <button className="icon-btn" onClick={load} disabled={busy} aria-label="새로고침" title="새로고침">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+            <path d="M21 3v6h-6" />
+          </svg>
+        </button>
+        <button className="leave-btn" onClick={onLeave} disabled={busy}>그룹 나가기</button>
+      </div>
     </main>
   )
 }

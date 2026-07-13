@@ -4,9 +4,12 @@ import Workout from './pages/Workout.jsx'
 import Group from './pages/Group.jsx'
 import Settings from './pages/Settings.jsx'
 import BottomNav from './components/BottomNav.jsx'
-import { getRecords, mergeRecords } from './storage.js'
+import { getRecords, mergeRecords, cleanupLocalPhotos, todayKey } from './storage.js'
 import { useAuth } from './useAuth.js'
-import { fetchServerRecords, syncLocalToServer } from './api.js'
+import { flushPendingProfile } from './auth.js'
+import { fetchServerRecords, syncLocalToServer, cleanupOldServerPhotos } from './api.js'
+
+const CLEANUP_KEY = 'absday.cleanup.v1'
 
 export default function App() {
   // view: home | workout | group | settings
@@ -16,14 +19,24 @@ export default function App() {
   const session = useAuth()
   const records = getRecords()
 
+  // 앱 시작 시: 7일 지난 로컬 인증샷 정리 (localStorage 용량 보호)
+  useEffect(() => { cleanupLocalPhotos(7) }, [])
+
   // 로그인되면: 서버 기록 내려받아 병합 + 비회원 시절 로컬 기록 서버로 업로드
+  // + 하루 1회, 30일 지난 내 서버 인증샷 정리
   useEffect(() => {
     if (!session) return
     let alive = true
+    flushPendingProfile().catch(() => {}) // 가입 시 못 올린 이름·전화번호 반영
     syncLocalToServer()
       .then(fetchServerRecords)
       .then(server => { if (alive && server) { mergeRecords(server); refresh() } })
       .catch(() => {})
+    if (localStorage.getItem(CLEANUP_KEY) !== todayKey()) {
+      cleanupOldServerPhotos(30)
+        .then(() => localStorage.setItem(CLEANUP_KEY, todayKey()))
+        .catch(() => {})
+    }
     return () => { alive = false }
   }, [session, refresh])
 

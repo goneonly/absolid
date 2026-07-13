@@ -10,18 +10,36 @@ const ERROR_KO = {
 }
 function ko(msg) { return ERROR_KO[msg] || `오류: ${msg}` }
 
+const PENDING_PROFILE_KEY = 'absday.pendingProfile.v1'
+
 export async function signUp(email, password, nickname, fullName, phone) {
   const { data, error } = await supabase.auth.signUp({ email, password })
   if (error) return { error: ko(error.message) }
-  if (data.user) {
-    await supabase.from('profiles').upsert({
-      id: data.user.id,
-      nickname: nickname || fullName || '',
-      full_name: fullName || '',
-      phone: phone || '',
-    })
+  const profile = {
+    nickname: nickname || fullName || '',
+    full_name: fullName || '',
+    phone: phone || '',
+  }
+  if (data.session && data.user) {
+    await supabase.from('profiles').upsert({ id: data.user.id, ...profile })
+  } else {
+    // 이메일 인증 대기 중엔 세션이 없어 RLS가 저장을 막음 → 첫 로그인 때 반영
+    localStorage.setItem(PENDING_PROFILE_KEY, JSON.stringify(profile))
   }
   return { data }
+}
+
+// 가입 시 저장하지 못한 프로필을 로그인 후 서버에 반영
+export async function flushPendingProfile() {
+  const raw = localStorage.getItem(PENDING_PROFILE_KEY)
+  if (!raw || !supabase) return
+  const { data } = await supabase.auth.getSession()
+  const user = data.session?.user
+  if (!user) return
+  try {
+    await supabase.from('profiles').upsert({ id: user.id, ...JSON.parse(raw) })
+    localStorage.removeItem(PENDING_PROFILE_KEY)
+  } catch { /* 다음 로그인 때 재시도 */ }
 }
 
 export async function signIn(email, password) {

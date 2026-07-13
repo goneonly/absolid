@@ -29,6 +29,23 @@ export function clearRecords() {
   localStorage.removeItem(RECORDS_KEY)
 }
 
+// 오래된 인증샷(dataURL)만 로컬에서 정리 — 완료 기록 자체는 유지
+// localStorage 한도(약 5MB) 보호: 최근 keepDays일 사진만 남김
+export function cleanupLocalPhotos(keepDays = 7) {
+  const all = getRecords()
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - (keepDays - 1))
+  const cutoffKey = todayKey(cutoff)
+  let changed = false
+  for (const k of Object.keys(all)) {
+    if (k < cutoffKey && all[k]?.photo) {
+      delete all[k].photo
+      changed = true
+    }
+  }
+  if (changed) localStorage.setItem(RECORDS_KEY, JSON.stringify(all))
+}
+
 export function computeStreak(records = getRecords()) {
   let streak = 0
   const d = new Date()
