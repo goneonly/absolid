@@ -1,6 +1,4 @@
-Personal Project w/ Full Vibe Coding
-
-# Absolid — 매일 복근, 같이 💪
+# Absolid  — Abs + Solid 💪
 
 초대 코드로 그룹을 만들어 날짜에 맞춰 복근 운동을 함께 하고 기록하는 모바일 웹앱.
 
@@ -33,3 +31,6 @@ npm run build    # 배포용 빌드
 ## 핵심 규칙
 - 오늘의 영상 = 이번 달 "일(day)" 번째 영상, 31일은 Day 30
 - 영상이 끝나야(다음 영상으로 넘어가거나 ENDED) 운동 완료 처리
+
+
+Personal Project w/ Full Vibe Coding
