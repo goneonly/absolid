@@ -9,6 +9,7 @@ import {
 import { supabase } from "../supabase.js";
 import { signUp, signIn, signOut, saveNickname } from "../auth.js";
 import { uploadAvatar, deleteAvatar } from "../api.js";
+import { isPushSupported, getPushEnabled, enablePush, disablePush } from "../push.js";
 import { toast } from "../toast.js";
 import {
   validateEmail,
@@ -124,6 +125,10 @@ export default function Settings({ session, onChanged, isAdmin, onOpenAdmin }) {
       <AccountCard session={session} nickname={nickname} />
 
       <section className="card">
+        <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>
+          기타
+        </div>
+        <PushToggleRow session={session} />
         <button className="row-btn" onClick={exportCSV}>
           기록 내보내기 (CSV){" "}
           <span className="hint">구글시트에서 열기 가능</span>
@@ -331,6 +336,48 @@ function ProfilePhoto({ nickname, session, onChanged }) {
         </div>
       )}
     </div>
+  );
+}
+
+// ── 운동 리마인더 푸시 알림 on/off (기타 카드 내 row) ──
+// 오늘 운동 기록이 없으면 매일 저녁 브라우저 푸시로 알려줍니다 (회원 전용)
+function PushToggleRow({ session }) {
+  const [enabled, setEnabled] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const supported = isPushSupported();
+
+  useEffect(() => {
+    if (session && supported) getPushEnabled().then(setEnabled);
+  }, [session, supported]);
+
+  // 비회원이거나 푸시 미지원 브라우저면 표시하지 않음
+  if (!session || !supported) return null;
+
+  async function toggle() {
+    setBusy(true);
+    try {
+      if (enabled) {
+        await disablePush();
+        setEnabled(false);
+        toast("리마인더 알림을 껐어요.");
+      } else {
+        await enablePush();
+        setEnabled(true);
+        toast("이제 운동 안 한 날 저녁에 알림을 보내드릴게요 🔔");
+      }
+    } catch (e) {
+      toast(e.message || "알림 설정에 실패했어요.");
+    }
+    setBusy(false);
+  }
+
+  return (
+    <button className="row-btn" disabled={busy} onClick={toggle}>
+      운동 리마인더 알림{" "}
+      <span className="hint">
+        {busy ? "처리 중…" : enabled ? "켜짐 🔔" : "꺼짐 🔕"}
+      </span>
+    </button>
   );
 }
 

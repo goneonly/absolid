@@ -9,6 +9,7 @@
 - [x] Day 5: 사진 업로드 서버 저장 (Supabase Storage — supabase/storage.sql 실행 필요)
 - [x] Day 6: 설정 고도화, 기록 CSV 내보내기(구글시트 호환) — 구글 로그인은 옵션이라 보류
 - [x] Day 7: 검증 + Vercel 배포 (https://absolid.vercel.app)
+- [x] Day 8: 미운동 리마인더 — 홈 배너(저녁 6시 이후) + 브라우저 푸시(매일 KST 20시, NOTIFICATIONS_SETUP.md)
 
 ## 실행 방법 (개발자용)
 ```bash
@@ -27,6 +28,8 @@ npm run build    # 배포용 빌드
 - `src/components/` — BottomNav(그룹|시작|설정), CompleteModal(사진 첨부)
 - `src/storage.js` — 기록/streak 계산 (현재 localStorage, Day 2에 Supabase로 확장)
 - `src/youtube.js` — YouTube IFrame API 로더, 플레이리스트 ID
+- `src/push.js`, `public/sw.js` — 브라우저 푸시 구독/수신 (Day 8)
+- `supabase/functions/send-reminders/` — 미운동 회원 푸시 발송 Edge Function (Day 8)
 
 ## 핵심 규칙
 - 오늘의 영상 = 이번 달 "일(day)" 번째 영상, 31일은 Day 30

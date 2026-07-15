@@ -6,6 +6,8 @@ import Settings from './pages/Settings.jsx'
 import Admin from './pages/Admin.jsx'
 import BottomNav from './components/BottomNav.jsx'
 import OnboardingModal from './components/OnboardingModal.jsx'
+import PushConsentModal from './components/PushConsentModal.jsx'
+import { isPushSupported } from './push.js'
 import { getRecords, mergeRecords, cleanupLocalPhotos, todayKey } from './storage.js'
 import { useAuth } from './useAuth.js'
 import { flushPendingProfile, signOut } from './auth.js'
@@ -14,6 +16,7 @@ import { fetchMyRole } from './admin.js'
 
 const CLEANUP_KEY = 'absolid.cleanup.v1'
 const ONBOARD_KEY = 'absolid.onboarding.v1'
+const PUSH_CONSENT_KEY = 'absolid.pushconsent.v1'
 
 export default function App() {
   // view: home | workout | group | settings | admin
@@ -21,6 +24,7 @@ export default function App() {
   const [, setTick] = useState(0)
   const [isAdmin, setIsAdmin] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
+  const [showPushConsent, setShowPushConsent] = useState(false)
   const refresh = useCallback(() => setTick(t => t + 1), [])
   const session = useAuth()
   const records = getRecords()
@@ -97,6 +101,19 @@ export default function App() {
           onClose={() => {
             localStorage.setItem(ONBOARD_KEY, 'done')
             setShowOnboarding(false)
+            // 온보딩 종료 후: 푸시 알림 동의 팝업을 1회 표시 (지원 브라우저만)
+            if (isPushSupported() && !localStorage.getItem(PUSH_CONSENT_KEY)) {
+              setShowPushConsent(true)
+            }
+          }}
+        />
+      )}
+
+      {showPushConsent && (
+        <PushConsentModal
+          onClose={() => {
+            localStorage.setItem(PUSH_CONSENT_KEY, 'done')
+            setShowPushConsent(false)
           }}
         />
       )}

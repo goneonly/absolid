@@ -136,6 +136,9 @@ input { font-family: inherit; }
   color: var(--text); border-radius: 12px; padding: 12px 14px;
   font-size: 13px; line-height: 1.5; margin-bottom: 14px;
 }
+.banner.reminder { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.reminder-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.reminder-actions .linklike { color: var(--red); font-weight: 700; font-size: 13px; padding: 4px 6px; }
 
 /* ── 인증샷 신고 ── */
 .report-link {
