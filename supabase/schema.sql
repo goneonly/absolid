@@ -34,6 +34,8 @@ create policy "workouts: 본인 기록" on public.workouts
   for insert with check (auth.uid() = user_id);
 create policy "workouts: 본인 수정" on public.workouts
   for update using (auth.uid() = user_id);
+create policy "workouts: 본인 삭제" on public.workouts
+  for delete using (auth.uid() = user_id);
 
 -- ── 그룹 (Day 3~4) ──────────────────────────
 create table if not exists public.groups (

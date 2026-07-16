@@ -8,7 +8,7 @@ import {
 } from "../storage.js";
 import { supabase } from "../supabase.js";
 import { signUp, signIn, signOut, saveNickname } from "../auth.js";
-import { uploadAvatar, deleteAvatar } from "../api.js";
+import { uploadAvatar, deleteAvatar, resetServerWorkouts } from "../api.js";
 import { isPushSupported, getPushEnabled, enablePush, disablePush } from "../push.js";
 import { toast } from "../toast.js";
 import {
@@ -80,11 +80,22 @@ export default function Settings({ session, onChanged, isAdmin, onOpenAdmin }) {
   const [resetPwError, setResetPwError] = useState("");
   const [resetPwBusy, setResetPwBusy] = useState(false);
 
-  function confirmReset() {
-    if (confirm("이 기기의 운동 기록을 삭제할까요? 되돌릴 수 없어요.")) {
-      clearRecords();
-      onChanged();
+  async function confirmReset() {
+    const msg = session
+      ? "모든 운동 기록을 삭제할까요? 서버에 저장된 기록과 인증샷도 함께 삭제되며 되돌릴 수 없어요."
+      : "이 기기의 운동 기록을 삭제할까요? 되돌릴 수 없어요.";
+    if (!confirm(msg)) return;
+    clearRecords();
+    if (session) {
+      const ok = await resetServerWorkouts();
+      if (!ok) {
+        toast("서버 기록 삭제에 실패했어요. supabase/reset-delete-policies.sql 실행 여부를 확인해 주세요.");
+        onChanged();
+        return;
+      }
     }
+    toast("운동 기록을 모두 삭제했어요.");
+    onChanged();
   }
 
   function reset() {
@@ -169,7 +180,10 @@ export default function Settings({ session, onChanged, isAdmin, onOpenAdmin }) {
           <span className="hint">구글시트에서 열기 가능</span>
         </button>
         <button className="row-btn danger" onClick={reset}>
-          운동 기록 초기화 (이 기기)
+          운동 기록 초기화{" "}
+          <span className="hint">
+            {session ? "서버 포함 전체 삭제" : "이 기기"}
+          </span>
         </button>
       </section>
 

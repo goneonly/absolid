@@ -223,6 +223,28 @@ export async function fetchGroupStatus(groupId) {
   return { members, photos }
 }
 
+// ── 운동 기록 전체 초기화 ────────────────────
+// 서버의 내 운동 기록(workouts)과 인증샷(Storage)을 모두 삭제
+// 반환: true = 성공, false = 서버 기록이 남아 있음 (삭제 정책 미설정 등)
+export async function resetServerWorkouts() {
+  const user_id = await uid()
+  if (!user_id) return true // 비회원: 서버 데이터 없음
+  try {
+    const { data: files } = await supabase.storage.from('photos').list(user_id, { limit: 1000 })
+    if (files?.length) {
+      await supabase.storage.from('photos').remove(files.map(f => `${user_id}/${f.name}`))
+    }
+  } catch { /* 사진 삭제 실패는 기록 삭제를 막지 않음 */ }
+  const { error } = await supabase.from('workouts').delete().eq('user_id', user_id)
+  if (error) return false
+  // RLS에 삭제 정책이 없으면 오류 없이 0건 삭제됨 — 실제로 비워졌는지 확인
+  const { count } = await supabase
+    .from('workouts')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', user_id)
+  return !count
+}
+
 // 비회원 시절 로컬 기록을 서버로 올리기 (로그인 직후 1회)
 export async function syncLocalToServer() {
   const user_id = await uid()

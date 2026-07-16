@@ -17,3 +17,8 @@ create policy "photos: 본인 폴더 덮어쓰기" on storage.objects
 
 create policy "photos: 누구나 조회" on storage.objects
   for select using (bucket_id = 'photos');
+
+create policy "photos: 본인 폴더 삭제" on storage.objects
+  for delete using (
+    bucket_id = 'photos' and auth.uid()::text = (storage.foldername(name))[1]
+  );
