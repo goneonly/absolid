@@ -74,11 +74,46 @@ export default function Settings({ session, onChanged, isAdmin, onOpenAdmin }) {
     URL.revokeObjectURL(a.href);
   }
 
-  function reset() {
+  // ── 운동 기록 초기화: 회원은 비밀번호 확인 후 → 기존 확인 알림 순서 ──
+  const [askResetPw, setAskResetPw] = useState(false);
+  const [resetPw, setResetPw] = useState("");
+  const [resetPwError, setResetPwError] = useState("");
+  const [resetPwBusy, setResetPwBusy] = useState(false);
+
+  function confirmReset() {
     if (confirm("이 기기의 운동 기록을 삭제할까요? 되돌릴 수 없어요.")) {
       clearRecords();
       onChanged();
     }
+  }
+
+  function reset() {
+    if (session) {
+      // 회원: 본인 확인(비밀번호) 먼저
+      setResetPw("");
+      setResetPwError("");
+      setAskResetPw(true);
+    } else {
+      // 비회원은 비밀번호가 없으므로 기존 확인만
+      confirmReset();
+    }
+  }
+
+  async function verifyResetPw() {
+    if (!resetPw) {
+      setResetPwError("비밀번호를 입력해 주세요.");
+      return;
+    }
+    setResetPwBusy(true);
+    const { error } = await signIn(session.user.email, resetPw);
+    setResetPwBusy(false);
+    if (error) {
+      setResetPwError(error);
+      return;
+    }
+    setAskResetPw(false);
+    // 모달이 닫힌 뒤 기존 확인 알림 표시
+    setTimeout(confirmReset, 100);
   }
 
   return (
@@ -166,6 +201,52 @@ export default function Settings({ session, onChanged, isAdmin, onOpenAdmin }) {
           GitHub
         </a>
       </div>
+
+      {askResetPw && (
+        <div className="modal-backdrop">
+          <div className="modal" role="dialog" aria-modal="true" aria-label="비밀번호 확인">
+            <h3>비밀번호 확인 🔒</h3>
+            <p className="sub" style={{ marginTop: 8 }}>
+              운동 기록 초기화는 되돌릴 수 없어요. 본인 확인을 위해 비밀번호를
+              입력해 주세요.
+            </p>
+            <div className="field" style={{ marginTop: 12 }}>
+              <label htmlFor="reset-pw">비밀번호</label>
+              <input
+                id="reset-pw"
+                type="password"
+                autoFocus
+                autoComplete="current-password"
+                value={resetPw}
+                onChange={(e) => {
+                  setResetPw(e.target.value);
+                  setResetPwError("");
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") verifyResetPw();
+                }}
+              />
+              {resetPwError && <p className="field-error">{resetPwError}</p>}
+            </div>
+            <button
+              className="cta"
+              style={{ marginTop: 14 }}
+              disabled={resetPwBusy}
+              onClick={verifyResetPw}
+            >
+              {resetPwBusy ? "확인 중…" : "확인"}
+            </button>
+            <button
+              className="cta secondary"
+              style={{ marginTop: 10 }}
+              disabled={resetPwBusy}
+              onClick={() => setAskResetPw(false)}
+            >
+              취소
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
