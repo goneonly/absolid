@@ -223,6 +223,21 @@ export async function fetchGroupStatus(groupId) {
   return { members, photos }
 }
 
+// ── 그룹 리더보드 ────────────────────────────
+// 기간 내 멤버별 인증 완료 날짜 집계 (RLS: 같은 그룹 멤버끼리 조회 가능)
+export async function fetchGroupWorkoutDates(memberIds, startKey, endKey) {
+  if (!memberIds?.length) return {}
+  const { data } = await supabase
+    .from('workouts')
+    .select('user_id, date')
+    .in('user_id', memberIds)
+    .gte('date', startKey)
+    .lte('date', endKey)
+  const out = {}
+  for (const w of data || []) (out[w.user_id] ||= new Set()).add(w.date)
+  return out
+}
+
 // ── 운동 기록 전체 초기화 ────────────────────
 // 서버의 내 운동 기록(workouts)과 인증샷(Storage)을 모두 삭제
 // 반환: true = 성공, false = 서버 기록이 남아 있음 (삭제 정책 미설정 등)

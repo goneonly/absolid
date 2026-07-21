@@ -4,6 +4,7 @@ import { supabase } from '../supabase.js'
 import { fetchMyGroup, createGroup, joinGroup, leaveGroup, fetchGroupStatus } from '../api.js'
 import { submitReport } from '../admin.js'
 import { toast } from '../toast.js'
+import Leaderboard from '../components/Leaderboard.jsx'
 
 const WEEK = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -226,6 +227,8 @@ export default function Group({ records, session }) {
           <span><i style={{ background: 'var(--gray-dot)' }} />아직 안 함</span>
         </div>
       </section>
+
+      <Leaderboard members={members} myId={myId} myName={myName} records={records} />
 
       <section className="card">
         <div style={{ fontWeight: 700, fontSize: 15 }}>오늘의 인증샷 📷</div>

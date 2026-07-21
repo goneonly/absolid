@@ -114,6 +114,34 @@ input { font-family: inherit; }
 .legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; }
 .tag { display: inline-block; font-size: 11px; font-weight: 700; color: var(--text-dim); background: var(--surface-2); border-radius: 6px; padding: 3px 8px; margin-left: 8px; vertical-align: middle; }
 
+/* ── 리더보드 ── */
+.lb-tabs { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+.lb-tab {
+  font-size: 12px; font-weight: 600; padding: 7px 12px; border-radius: 999px;
+  background: var(--surface-2); color: var(--text-dim); border: 1px solid var(--border);
+}
+.lb-tab.on { background: rgba(255,59,48,.15); color: var(--red); border-color: rgba(255,59,48,.4); }
+.lb-custom { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.lb-custom .input { flex: 1; padding: 9px 10px; font-size: 13px; color-scheme: dark; }
+.lb-me {
+  margin-top: 12px; padding: 10px 14px; border-radius: 12px;
+  background: rgba(255,59,48,.12); border: 1px solid rgba(255,59,48,.3);
+  font-size: 13px;
+}
+.lb-me strong { color: var(--red); font-size: 15px; }
+.lb-row { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--border); }
+.lb-row:last-child { border-bottom: none; }
+.lb-row.me .name { color: var(--red); }
+.lb-rank { width: 26px; text-align: center; font-weight: 800; font-size: 13px; color: var(--text-dim); flex: none; }
+.lb-rank.medal { font-size: 16px; }
+.lb-bar { height: 4px; border-radius: 2px; background: var(--surface-2); margin-top: 6px; overflow: hidden; }
+.lb-bar i { display: block; height: 100%; border-radius: 2px; background: var(--red); transition: width .3s ease; }
+.lb-delta { font-size: 11px; font-weight: 700; color: var(--gray-dot); width: 30px; text-align: right; flex: none; }
+.lb-delta.up { color: #30d158; }
+.lb-delta.down { color: var(--text-dim); }
+.lb-count { font-weight: 800; font-size: 14px; width: 40px; text-align: right; flex: none; }
+.lb-count span { font-size: 11px; font-weight: 400; color: var(--text-dim); margin-left: 1px; }
+
 /* ── 오늘의 인증샷 그리드 (고정 사이즈, 많아지면 스크롤) ── */
 .photo-grid {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
