@@ -52,6 +52,41 @@ export async function signOut() {
   await supabase.auth.signOut()
 }
 
+// 비밀번호 재설정 메일 발송 — 링크를 누르면 앱으로 돌아와 새 비밀번호를 설정
+export async function sendPasswordReset(email) {
+  if (!supabase) return { error: '서버가 연결되어 있지 않아요.' }
+  const { error } = await supabase.auth.resetPasswordForEmail((email || '').trim(), {
+    redirectTo: window.location.origin,
+  })
+  if (error) return { error: ko(error.message) }
+  return { data: true }
+}
+
+// 복구 세션에서 새 비밀번호 저장
+export async function updatePassword(newPassword) {
+  if (!supabase) return { error: '서버가 연결되어 있지 않아요.' }
+  const { error } = await supabase.auth.updateUser({ password: newPassword })
+  if (error) return { error: ko(error.message) }
+  return { data: true }
+}
+
+// 회원 탈퇴 — 계정과 모든 데이터 삭제 (delete-account 엣지 함수 필요)
+export async function deleteAccount() {
+  if (!supabase) return { error: '서버가 연결되어 있지 않아요.' }
+  const { error } = await supabase.functions.invoke('delete-account', { method: 'POST' })
+  if (error) {
+    return { error: '탈퇴 처리에 실패했어요. 잠시 후 다시 시도하거나 관리자에게 문의해 주세요.' }
+  }
+  // 로컬 흔적 정리 후 로그아웃
+  try {
+    for (const k of Object.keys(localStorage)) {
+      if (k.startsWith('absolid.')) localStorage.removeItem(k)
+    }
+  } catch { /* noop */ }
+  await supabase.auth.signOut()
+  return { data: true }
+}
+
 export async function saveNickname(nickname) {
   const { data } = await supabase.auth.getSession()
   const user = data.session?.user

@@ -8,6 +8,34 @@ async function uid() {
   return data.session?.user?.id || null
 }
 
+// ── 인증샷 signed URL 헬퍼 ───────────────────
+// photos 버킷은 비공개라 조회 시 짧은 유효기간의 signed URL 을 발급받아야 함.
+// DB에는 스토리지 경로(`uid/date.jpg`)를 저장하되, 과거 public URL 로 저장된 값도 경로를 추출해 호환.
+const PHOTO_TTL = 60 * 60 * 8 // 8시간
+
+export function photoObjectPath(value) {
+  if (!value) return null
+  const marker = '/photos/'
+  const i = value.indexOf(marker)
+  return i >= 0 ? value.slice(i + marker.length) : value // 이미 경로면 그대로
+}
+
+// 여러 경로를 한 번에 서명 → { path: signedUrl } 매핑 반환
+async function signPhotoPaths(paths) {
+  const clean = [...new Set(paths.filter(Boolean).map(photoObjectPath))]
+  if (!clean.length) return {}
+  try {
+    const { data } = await supabase.storage.from('photos').createSignedUrls(clean, PHOTO_TTL)
+    const out = {}
+    for (const item of data || []) {
+      if (item?.path && item?.signedUrl) out[item.path] = item.signedUrl
+    }
+    return out
+  } catch {
+    return {}
+  }
+}
+
 export async function pushRecord(dateKey, day, completedAt) {
   const user_id = await uid()
   if (!user_id) return
@@ -45,14 +73,12 @@ export async function uploadPhoto(dateKey, dataUrl) {
       .from('photos')
       .upload(path, blob, { upsert: true, contentType: 'image/jpeg' })
     if (error) return null
-    const { data } = supabase.storage.from('photos').getPublicUrl(path)
-    const photo_url = data?.publicUrl || null
-    if (photo_url) {
-      await supabase.from('workouts')
-        .update({ photo_url })
-        .eq('user_id', user_id).eq('date', dateKey)
-    }
-    return photo_url
+    // 비공개 버킷: DB에는 경로를 저장하고, 즉시 표시용 signed URL 을 반환
+    await supabase.from('workouts')
+      .update({ photo_url: path })
+      .eq('user_id', user_id).eq('date', dateKey)
+    const { data } = await supabase.storage.from('photos').createSignedUrl(path, PHOTO_TTL)
+    return data?.signedUrl || path
   } catch { return null }
 }
 
@@ -136,6 +162,10 @@ export async function fetchMyGroup() {
 export async function createGroup(name, nickname, options = {}) {
   const user_id = await uid()
   if (!user_id) throw new Error('로그인이 필요해요.')
+  // 단일 그룹 정책: 이미 그룹에 속해 있으면 생성 불가
+  const { data: existing } = await supabase
+    .from('group_members').select('group_id').eq('user_id', user_id).limit(1)
+  if (existing?.length) throw new Error('이미 그룹에 참여 중이에요. 먼저 나간 뒤 새 그룹을 만들 수 있어요.')
   const max_members = Math.min(50, Math.max(2, Number(options.maxMembers) || 10))
   const members_only = !!options.membersOnly
   await pushProfile(nickname)
@@ -160,28 +190,13 @@ export async function joinGroup(code, nickname) {
   if (!user_id) throw new Error('로그인이 필요해요.')
   const clean = (code || '').trim().toUpperCase()
   if (clean.length !== 6) throw new Error('초대 코드는 6자리예요.')
-  const { data: rows } = await supabase.rpc('find_group_by_invite_code', { code: clean })
-  const g = rows?.[0]
-  if (!g) throw new Error('초대 코드를 찾을 수 없어요. 다시 확인해 주세요.')
 
-  // 인원수 제한 확인
-  const { data: count } = await supabase.rpc('group_member_count', { gid: g.id })
-  if (typeof count === 'number' && count >= g.max_members) {
-    throw new Error(`이 그룹은 정원(${g.max_members}명)이 가득 찼어요.`)
-  }
-
-  // 회원만 받기: 이름·전화번호를 등록한 정회원만 참여 가능
-  if (g.members_only) {
-    const { data: me } = await supabase
-      .from('profiles').select('full_name, phone').eq('id', user_id).maybeSingle()
-    if (!me?.full_name || !me?.phone) {
-      throw new Error('이 그룹은 이름·전화번호를 등록한 회원만 참여할 수 있어요. 설정에서 회원가입을 완료해 주세요.')
-    }
-  }
-
+  // 닉네임을 먼저 반영한 뒤, 정원·회원제한·중복참여를 서버에서 원자적으로 처리
   await pushProfile(nickname)
-  const { error } = await supabase.from('group_members').insert({ group_id: g.id, user_id })
-  if (error && !String(error.message).includes('duplicate')) throw new Error('참여에 실패했어요. 잠시 후 다시 시도해 주세요.')
+  const { data, error } = await supabase.rpc('join_group', { code: clean })
+  if (error) throw new Error(error.message || '참여에 실패했어요. 잠시 후 다시 시도해 주세요.')
+  const g = Array.isArray(data) ? data[0] : data
+  if (!g) throw new Error('초대 코드를 찾을 수 없어요. 다시 확인해 주세요.')
   return g
 }
 
@@ -207,13 +222,20 @@ export async function fetchGroupStatus(groupId) {
   const names = Object.fromEntries((profs || []).map(p => [p.id, p.nickname]))
   const avatars = Object.fromEntries((profs || []).map(p => [p.id, p.avatar_url || '']))
   const doneDates = {}
-  const photos = []
+  const todayPhotoRows = []
   for (const w of works || []) {
     (doneDates[w.user_id] ||= new Set()).add(w.date)
-    if (w.date === todayStr && w.photo_url) {
-      photos.push({ id: w.user_id, name: names[w.user_id] || '이름 없음', url: w.photo_url })
-    }
+    if (w.date === todayStr && w.photo_url) todayPhotoRows.push(w)
   }
+  // 비공개 버킷: 오늘 인증샷 경로를 한 번에 서명
+  const signed = await signPhotoPaths(todayPhotoRows.map(w => w.photo_url))
+  const photos = todayPhotoRows
+    .map(w => ({
+      id: w.user_id,
+      name: names[w.user_id] || '이름 없음',
+      url: signed[photoObjectPath(w.photo_url)] || null,
+    }))
+    .filter(p => p.url)
   const members = ids.map(id => ({
     id,
     name: names[id] || '이름 없음',

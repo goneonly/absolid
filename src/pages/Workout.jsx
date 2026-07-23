@@ -13,6 +13,7 @@ export default function Workout({ onDone, session }) {
   const playerRef = useRef(null);
   const startedRef = useRef(false);
   const finishedRef = useRef(false);
+  const startIndexRef = useRef(null); // 실제 시작 인덱스 (요청 인덱스가 클램프될 수 있어 기록)
   const [showModal, setShowModal] = useState(false);
   const [canFinish, setCanFinish] = useState(false);
   const day = todayWorkoutDay();
@@ -29,23 +30,26 @@ export default function Workout({ onDone, session }) {
         events: {
           onReady: (e) => {
             // 플레이리스트의 (day-1)번째 영상 = 오늘의 Day 영상
+            // (영상 수가 부족하면 YouTube가 인덱스를 클램프할 수 있어 최소 0으로 보정)
             e.target.cuePlaylist({
               listType: "playlist",
               list: playlistId,
-              index: day - 1,
+              index: Math.max(0, day - 1),
             });
           },
           onStateChange: (e) => {
             const YTState = window.YT.PlayerState;
             if (finishedRef.current) return;
             if (e.data === YTState.PLAYING) {
-              // 재생이 시작된 뒤 다음 영상으로 자동 전환되면 = 오늘 영상 끝
               const idx = e.target.getPlaylistIndex();
-              if (startedRef.current && idx !== day - 1) {
+              if (startIndexRef.current === null) {
+                // 첫 재생: 실제 시작 인덱스를 기준으로 저장 (요청 인덱스 클램프 대비)
+                startIndexRef.current = idx;
+                startedRef.current = true;
+              } else if (startedRef.current && idx !== startIndexRef.current) {
+                // 다음 영상으로 자동 전환됨 = 오늘 영상 끝
                 e.target.pauseVideo();
                 finish();
-              } else {
-                startedRef.current = true;
               }
             }
             if (e.data === YTState.ENDED) finish(); // 플레이리스트 마지막 영상(day 30)인 경우

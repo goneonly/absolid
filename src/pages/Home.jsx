@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { computeStreak, lastNDays, todayKey, todayWorkoutDay } from '../storage.js'
 import { fetchActiveAnnouncement } from '../admin.js'
+import WeeklyReport from '../components/WeeklyReport.jsx'
 
 const DOW = ['일', '월', '화', '수', '목', '금', '토']
 const REMIND_DISMISS_KEY = 'absolid.remind.dismissed'
@@ -65,6 +66,8 @@ export default function Home({ records, onStart }) {
           ))}
         </div>
       </section>
+
+      <WeeklyReport records={records} />
 
       <button className="cta" onClick={onStart}>
         {doneToday ? '오늘 운동 다시 보기' : `Day ${day} 운동 시작하기`}

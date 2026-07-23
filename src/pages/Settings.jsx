@@ -7,7 +7,14 @@ import {
   todayKey,
 } from "../storage.js";
 import { supabase } from "../supabase.js";
-import { signUp, signIn, signOut, saveNickname } from "../auth.js";
+import {
+  signUp,
+  signIn,
+  signOut,
+  saveNickname,
+  sendPasswordReset,
+  deleteAccount,
+} from "../auth.js";
 import { uploadAvatar, deleteAvatar, resetServerWorkouts } from "../api.js";
 import { isPushSupported, getPushEnabled, enablePush, disablePush } from "../push.js";
 import { toast } from "../toast.js";
@@ -488,6 +495,26 @@ function AccountCard({ session, nickname }) {
   const [notice, setNotice] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+  const [resetBusy, setResetBusy] = useState(false);
+
+  async function forgotPassword() {
+    setError("");
+    setNotice("");
+    const emailErr = validateEmail(email);
+    if (emailErr) {
+      setFieldErrors((p) => ({ ...p, email: emailErr }));
+      return;
+    }
+    setResetBusy(true);
+    const res = await sendPasswordReset(email.trim());
+    setResetBusy(false);
+    if (res?.error) setError(res.error);
+    else
+      setNotice(
+        "비밀번호 재설정 메일을 보냈어요. 메일의 링크를 열면 새 비밀번호를 정할 수 있어요.",
+      );
+  }
 
   if (!supabase) {
     return (
@@ -519,6 +546,19 @@ function AccountCard({ session, nickname }) {
         >
           로그아웃
         </button>
+        <button
+          className="linklike danger-link"
+          style={{ marginTop: 14, display: "block" }}
+          onClick={() => setShowDelete(true)}
+        >
+          회원 탈퇴
+        </button>
+        {showDelete && (
+          <DeleteAccountModal
+            email={session.user.email}
+            onClose={() => setShowDelete(false)}
+          />
+        )}
       </section>
     );
   }
@@ -702,6 +742,17 @@ function AccountCard({ session, nickname }) {
             <p className="field-error">{fieldErrors.password}</p>
           )}
         </div>
+        {mode === "signin" && (
+          <button
+            type="button"
+            className="linklike"
+            style={{ marginTop: 10, textDecoration: "underline" }}
+            disabled={resetBusy}
+            onClick={forgotPassword}
+          >
+            {resetBusy ? "메일 보내는 중…" : "비밀번호를 잊으셨나요?"}
+          </button>
+        )}
         {mode === "signup" && (
           <div className="consent">
             <label className="consent-row">
@@ -765,6 +816,88 @@ function AccountCard({ session, nickname }) {
   );
 }
 
+// ── 회원 탈퇴 모달 (비밀번호 재확인 필수) ───────
+function DeleteAccountModal({ email, onClose }) {
+  const [pw, setPw] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function confirmDelete() {
+    if (!pw) {
+      setErr("비밀번호를 입력해 주세요.");
+      return;
+    }
+    setBusy(true);
+    // 본인 확인
+    const { error: signInErr } = await signIn(email, pw);
+    if (signInErr) {
+      setBusy(false);
+      setErr(signInErr);
+      return;
+    }
+    const res = await deleteAccount();
+    setBusy(false);
+    if (res?.error) {
+      setErr(res.error);
+      return;
+    }
+    toast("계정과 모든 데이터를 삭제했어요. 그동안 함께해 주셔서 고마워요.");
+    // deleteAccount 내부에서 로그아웃되어 세션이 사라지면 이 모달은 자동으로 닫힘
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="회원 탈퇴"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3>회원 탈퇴 😢</h3>
+        <p className="sub" style={{ marginTop: 8 }}>
+          탈퇴하면 계정과 운동 기록·인증샷·그룹 정보가 <strong>모두 영구 삭제</strong>
+          되며 되돌릴 수 없어요. 계속하려면 비밀번호를 입력해 주세요.
+        </p>
+        <div className="field" style={{ marginTop: 12 }}>
+          <label htmlFor="del-pw">비밀번호</label>
+          <input
+            id="del-pw"
+            type="password"
+            autoFocus
+            autoComplete="current-password"
+            value={pw}
+            onChange={(e) => {
+              setPw(e.target.value);
+              setErr("");
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") confirmDelete();
+            }}
+          />
+          {err && <p className="field-error">{err}</p>}
+        </div>
+        <button
+          className="cta"
+          style={{ marginTop: 14 }}
+          disabled={busy}
+          onClick={confirmDelete}
+        >
+          {busy ? "처리 중…" : "탈퇴하기"}
+        </button>
+        <button
+          className="cta secondary"
+          style={{ marginTop: 10 }}
+          disabled={busy}
+          onClick={onClose}
+        >
+          취소
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── 개인정보 처리 동의 전문 모달 ───────────────
 function PrivacyModal({ onClose }) {
   return (
@@ -785,8 +918,11 @@ function PrivacyModal({ onClose }) {
           <strong>수집 항목</strong>
           <ul>
             <li>이메일</li>
+            <li>이름</li>
+            <li>전화번호</li>
             <li>닉네임</li>
             <li>비밀번호(암호화 저장)</li>
+            <li>프로필 사진 · 인증샷(선택 업로드)</li>
             <li>운동 기록(사용자가 직접 입력한 정보)</li>
           </ul>
           <strong>이용 목적</strong>

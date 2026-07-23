@@ -1,6 +1,7 @@
 // 관리자 모드 API — 모든 쓰기 권한은 서버 RLS(is_admin)로 검증됨
 import { supabase } from "./supabase.js";
 import { PLAYLIST_ID } from "./youtube.js";
+import { photoObjectPath } from "./api.js";
 
 // ── 역할 조회 (일반 사용자도 사용) ─────────────
 export async function fetchMyRole() {
@@ -104,8 +105,18 @@ export async function fetchReports() {
       .in("date", reports.map((r) => r.target_date)),
   ]);
   const names = Object.fromEntries((profs || []).map((p) => [p.id, p.nickname]));
+  // 비공개 버킷: 인증샷 경로를 signed URL 로 서명
+  const paths = [
+    ...new Set((works || []).map((w) => w.photo_url).filter(Boolean).map(photoObjectPath)),
+  ];
+  const signed = {};
+  if (paths.length) {
+    const { data } = await supabase.storage.from("photos").createSignedUrls(paths, 3600);
+    for (const it of data || []) if (it?.path && it?.signedUrl) signed[it.path] = it.signedUrl;
+  }
   const photoOf = {};
-  for (const w of works || []) photoOf[`${w.user_id}|${w.date}`] = w.photo_url;
+  for (const w of works || [])
+    if (w.photo_url) photoOf[`${w.user_id}|${w.date}`] = signed[photoObjectPath(w.photo_url)] || null;
   return reports.map((r) => ({
     ...r,
     reporterName: names[r.reporter_id] || "이름 없음",

@@ -10,6 +10,7 @@
 - [x] Day 6: 설정 고도화, 기록 CSV 내보내기(구글시트 호환) — 구글 로그인은 옵션이라 보류
 - [x] Day 7: 검증 + Vercel 배포 (https://absolid.vercel.app)
 - [x] Day 8: 미운동 리마인더 — 홈 배너(저녁 6시 이후) + 브라우저 푸시(매일 KST 20시, NOTIFICATIONS_SETUP.md)
+- [x] v0.4: 보안·버그 패치(권한상승 차단·관리자 조회 복구·인증샷 비공개 signed URL·원자적 그룹참여), 비밀번호 재설정, 회원 탈퇴, 주간 리포트, CI(GitHub Actions) — `supabase/security-and-fixes.sql` 실행 필요
 
 ## 실행 방법 (개발자용)
 ```bash

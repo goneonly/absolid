@@ -7,6 +7,8 @@ import Admin from './pages/Admin.jsx'
 import BottomNav from './components/BottomNav.jsx'
 import OnboardingModal from './components/OnboardingModal.jsx'
 import PushConsentModal from './components/PushConsentModal.jsx'
+import RecoveryModal from './components/RecoveryModal.jsx'
+import { supabase } from './supabase.js'
 import { isPushSupported } from './push.js'
 import { getRecords, mergeRecords, cleanupLocalPhotos, todayKey } from './storage.js'
 import { useAuth } from './useAuth.js'
@@ -25,12 +27,22 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showPushConsent, setShowPushConsent] = useState(false)
+  const [showRecovery, setShowRecovery] = useState(false)
   const refresh = useCallback(() => setTick(t => t + 1), [])
   const session = useAuth()
   const records = getRecords()
 
   // 앱 시작 시: 7일 지난 로컬 인증샷 정리 (localStorage 용량 보호)
   useEffect(() => { cleanupLocalPhotos(7) }, [])
+
+  // 비밀번호 재설정 메일 링크로 진입하면 새 비밀번호 설정 모달 표시
+  useEffect(() => {
+    if (!supabase) return
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') { setView('settings'); setShowRecovery(true) }
+    })
+    return () => sub.subscription.unsubscribe()
+  }, [])
 
   // 가입 완료 후 첫 진입: 홈으로 이동 + 기능 소개 팝업 1회
   useEffect(() => {
@@ -117,6 +129,8 @@ export default function App() {
           }}
         />
       )}
+
+      {showRecovery && <RecoveryModal onClose={() => setShowRecovery(false)} />}
 
       <BottomNav view={view} onChange={setView} />
     </div>
