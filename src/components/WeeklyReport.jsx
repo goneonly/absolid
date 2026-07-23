@@ -1,7 +1,7 @@
 import { useMemo } from "react";
-import { todayKey, computeStreak } from "../storage.js";
+import { todayKey, computeStreak, lastNDays } from "../storage.js";
 
-const DOW = ["월", "화", "수", "목", "금", "토", "일"];
+const DOW = ["일", "월", "화", "수", "목", "금", "토"];
 
 function mondayOf(d) {
   const x = new Date(d);
@@ -21,7 +21,7 @@ function keysFrom(start, n) {
   return out;
 }
 
-// 이번 주(월~일) 인증 현황 + 지난주 대비 요약 카드
+// 이번 주(월~일) 인증 요약 + 지난주 대비 + 최근 7일 현황
 export default function WeeklyReport({ records }) {
   const data = useMemo(() => {
     const monday = mondayOf(new Date());
@@ -44,19 +44,14 @@ export default function WeeklyReport({ records }) {
       delta: count - lastCount,
       rate,
       streak: computeStreak(records),
-      days: weekKeys.map((k, i) => ({
-        label: DOW[i],
-        done: done(k),
-        today: k === today,
-        future: k > today,
-      })),
+      recent: lastNDays(7, records),
       range: `${weekKeys[0].slice(5).replace("-", ".")} ~ ${weekKeys[6]
         .slice(5)
         .replace("-", ".")}`,
     };
   }, [records]);
 
-  const { count, lastCount, delta, rate, streak, days, range } = data;
+  const { count, lastCount, delta, rate, streak, recent, range } = data;
 
   const message =
     count === 0
@@ -70,7 +65,7 @@ export default function WeeklyReport({ records }) {
   return (
     <section className="card weekly-report">
       <div className="wr-head">
-        <span className="wr-title">주간 리포트 📊</span>
+        <span className="wr-title">주간 리포트</span>
         <span className="sub" style={{ fontSize: 11 }}>
           이번 주 · {range}
         </span>
@@ -100,24 +95,6 @@ export default function WeeklyReport({ records }) {
         </div>
       </div>
 
-      <div className="wr-week">
-        {days.map((d, i) => (
-          <div className="wr-day" key={i}>
-            <div
-              className={
-                "wr-dot" +
-                (d.done ? " done" : "") +
-                (d.today ? " today" : "") +
-                (d.future ? " future" : "")
-              }
-            >
-              {d.done ? "✓" : ""}
-            </div>
-            <span>{d.label}</span>
-          </div>
-        ))}
-      </div>
-
       <div className="wr-bar" aria-hidden="true">
         <i style={{ width: `${Math.min(100, rate)}%` }} />
       </div>
@@ -131,6 +108,22 @@ export default function WeeklyReport({ records }) {
         )}{" "}
         · {message}
       </p>
+
+      <div className="wr-recent">
+        <div className="sub" style={{ marginBottom: 12 }}>
+          최근 7일
+        </div>
+        <div className="week">
+          {recent.map((d, i) => (
+            <div className="day" key={d.key}>
+              <div className={"dot" + (d.done ? " done" : "") + (i === 6 ? " today" : "")}>
+                {d.done ? "✓" : d.date.getDate()}
+              </div>
+              {DOW[d.date.getDay()]}
+            </div>
+          ))}
+        </div>
+      </div>
     </section>
   );
 }

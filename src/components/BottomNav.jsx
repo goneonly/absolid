@@ -8,18 +8,18 @@ export default function BottomNav({ view, onChange }) {
         </svg>
         그룹
       </button>
-      {view === 'workout' ? (
+      {view === 'home' ? (
+        <button className="nav-start" onClick={() => onChange('workout')} aria-label="운동 시작">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z" /></svg>
+          시작
+        </button>
+      ) : (
         <button className="nav-start" onClick={() => onChange('home')} aria-label="홈으로">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M3 10.5 12 3l9 7.5" />
             <path d="M5.5 9.5V21h13V9.5" />
           </svg>
           홈
-        </button>
-      ) : (
-        <button className="nav-start" onClick={() => onChange('workout')} aria-label="운동 시작">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z" /></svg>
-          시작
         </button>
       )}
       <button className={'nav-btn' + (view === 'settings' ? ' active' : '')} onClick={() => onChange('settings')}>

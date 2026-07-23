@@ -1,16 +1,14 @@
 import { useEffect, useState } from 'react'
-import { computeStreak, lastNDays, todayKey, todayWorkoutDay } from '../storage.js'
+import { computeStreak, todayKey, todayWorkoutDay } from '../storage.js'
 import { fetchActiveAnnouncement } from '../admin.js'
 import WeeklyReport from '../components/WeeklyReport.jsx'
 
-const DOW = ['일', '월', '화', '수', '목', '금', '토']
 const REMIND_DISMISS_KEY = 'absolid.remind.dismissed'
 const REMIND_AFTER_HOUR = 18 // 저녁 6시 이후부터 리마인더 표시
 
 export default function Home({ records, onStart }) {
   const streak = computeStreak(records)
   const doneToday = !!records[todayKey()]?.completed
-  const week = lastNDays(7, records)
   const day = todayWorkoutDay()
   const [notice, setNotice] = useState(null)
   const [remindDismissed, setRemindDismissed] = useState(
@@ -50,20 +48,6 @@ export default function Home({ records, onStart }) {
         <div className="streak-label">연속 운동 streak</div>
         <div className={'badge ' + (doneToday ? 'done' : 'todo')}>
           {doneToday ? '✓ 오늘 운동 완료!' : '오늘 아직 운동 전이에요'}
-        </div>
-      </section>
-
-      <section className="card">
-        <div className="sub" style={{ marginBottom: 12 }}>최근 7일</div>
-        <div className="week">
-          {week.map((d, i) => (
-            <div className="day" key={d.key}>
-              <div className={'dot' + (d.done ? ' done' : '') + (i === 6 ? ' today' : '')}>
-                {d.done ? '✓' : d.date.getDate()}
-              </div>
-              {DOW[d.date.getDay()]}
-            </div>
-          ))}
         </div>
       </section>
 
