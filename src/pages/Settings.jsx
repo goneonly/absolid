@@ -7,14 +7,7 @@ import {
   todayKey,
 } from "../storage.js";
 import { supabase } from "../supabase.js";
-import {
-  signUp,
-  signIn,
-  signOut,
-  saveNickname,
-  sendPasswordReset,
-  deleteAccount,
-} from "../auth.js";
+import { signIn, signOut, saveNickname, deleteAccount } from "../auth.js";
 import { uploadAvatar, deleteAvatar, resetServerWorkouts } from "../api.js";
 import { isPushSupported, getPushEnabled, enablePush, disablePush } from "../push.js";
 import { toast } from "../toast.js";
@@ -24,7 +17,6 @@ import {
   Card,
   CardTitle,
   Field,
-  FieldError,
   LinkButton,
   Modal,
   ModalText,
@@ -35,20 +27,14 @@ import {
   RowButton,
   Sub,
 } from "../components/ui.jsx";
-import {
-  validateEmail,
-  validateName,
-  validatePhone,
-  formatPhone,
-  validatePassword,
-  validateNickname,
-} from "../validation.js";
+import { validateNickname } from "../validation.js";
 
-export default function Settings({ session, onChanged, isAdmin, onOpenAdmin }) {
+export default function Settings({ session, onChanged, isAdmin, onOpenAdmin, onRequestLogin }) {
   const [nickname, setNickname] = useState(getProfile().nickname);
   const [nickError, setNickError] = useState("");
   const [saved, setSaved] = useState(false);
   const [askExport, setAskExport] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
 
   async function save() {
     const err = validateNickname(nickname);
@@ -167,9 +153,21 @@ export default function Settings({ session, onChanged, isAdmin, onOpenAdmin }) {
         <Button variant="secondary" className="mt-3.5" onClick={save}>
           {saved ? "저장됐어요 ✓" : "저장"}
         </Button>
+        {/* 비회원: 첫 화면(로그인)으로 이동 — 회원가입도 거기서 */}
+        {!session && supabase && (
+          <Button className="mt-2.5" onClick={onRequestLogin}>
+            로그인하기
+          </Button>
+        )}
       </Card>
 
-      <AccountCard session={session} nickname={nickname} />
+      {isAdmin && (
+        <Card>
+          <RowButton hint="회원·그룹·신고 관리" onClick={onOpenAdmin}>
+            관리자 페이지
+          </RowButton>
+        </Card>
+      )}
 
       <Card>
         <CardTitle className="mb-1.5">기타</CardTitle>
@@ -180,14 +178,17 @@ export default function Settings({ session, onChanged, isAdmin, onOpenAdmin }) {
         <RowButton danger hint={session ? "서버 포함 전체 삭제" : "이 기기"} onClick={reset}>
           운동 기록 초기화
         </RowButton>
+        {session && (
+          <RowButton danger hint="계정·데이터 영구 삭제" onClick={() => setShowDelete(true)}>
+            회원 탈퇴
+          </RowButton>
+        )}
       </Card>
 
-      {isAdmin && (
-        <Card>
-          <RowButton hint="회원·그룹·신고 관리" onClick={onOpenAdmin}>
-            관리자 페이지
-          </RowButton>
-        </Card>
+      {session && (
+        <LinkButton className="mx-auto mt-4 block px-2 py-1 text-sm underline" onClick={() => signOut()}>
+          로그아웃
+        </LinkButton>
       )}
 
       <Sub className="mt-4 text-center">Absolid v{__APP_VERSION__}</Sub>
@@ -208,6 +209,13 @@ export default function Settings({ session, onChanged, isAdmin, onOpenAdmin }) {
           GitHub
         </a>
       </div>
+
+      {showDelete && session && (
+        <DeleteAccountModal
+          email={session.user.email}
+          onClose={() => setShowDelete(false)}
+        />
+      )}
 
       {askExport && (
         <Modal label="기록 내보내기" onBackdrop={() => setAskExport(false)}>
@@ -469,290 +477,6 @@ function PushToggleRow({ session }) {
   );
 }
 
-function AccountCard({ session, nickname }) {
-  const [mode, setMode] = useState("signin"); // signin | signup
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [fieldErrors, setFieldErrors] = useState({});
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState("");
-  const [agreed, setAgreed] = useState(false);
-  const [showPrivacy, setShowPrivacy] = useState(false);
-  const [showDelete, setShowDelete] = useState(false);
-  const [resetBusy, setResetBusy] = useState(false);
-
-  async function forgotPassword() {
-    setError("");
-    setNotice("");
-    const emailErr = validateEmail(email);
-    if (emailErr) {
-      setFieldErrors((p) => ({ ...p, email: emailErr }));
-      return;
-    }
-    setResetBusy(true);
-    const res = await sendPasswordReset(email.trim());
-    setResetBusy(false);
-    if (res?.error) setError(res.error);
-    else
-      setNotice(
-        "비밀번호 재설정 메일을 보냈어요. 메일의 링크를 열면 새 비밀번호를 정할 수 있어요.",
-      );
-  }
-
-  if (!supabase) {
-    return (
-      <Card>
-        <CardTitle>계정</CardTitle>
-        <Sub className="mt-1.5">
-          서버(Supabase) 연결 대기 중이에요. 프로젝트 키를 연결하면
-          로그인·회원가입이 열립니다. 연결 방법은 SUPABASE_SETUP.md 문서를
-          참고해 주세요.
-        </Sub>
-      </Card>
-    );
-  }
-
-  if (session) {
-    return (
-      <Card>
-        <CardTitle>계정</CardTitle>
-        <Sub className="mt-1.5">{session.user.email}</Sub>
-        <Sub className="mt-1">
-          기록이 계정에 안전하게 저장돼요. 어느 기기서든 이어갈 수 있어요.
-        </Sub>
-        <Button variant="secondary" className="mt-3.5" onClick={() => signOut()}>
-          로그아웃
-        </Button>
-        <LinkButton
-          className="mt-3.5 block w-full text-center text-sm text-brand"
-          onClick={() => setShowDelete(true)}
-        >
-          회원 탈퇴
-        </LinkButton>
-        {showDelete && (
-          <DeleteAccountModal
-            email={session.user.email}
-            onClose={() => setShowDelete(false)}
-          />
-        )}
-      </Card>
-    );
-  }
-
-  // 필드별 엄격 검증 — 통과 못 하면 제출 자체를 막음
-  function validateAll() {
-    const errs = {};
-    if (mode === "signup") {
-      errs.fullName = validateName(fullName);
-      errs.phone = validatePhone(phone);
-      errs.password = validatePassword(password);
-      errs.agreed = agreed ? "" : "개인정보 수집·이용에 동의해 주세요.";
-    } else {
-      errs.password = !password ? "비밀번호를 입력해 주세요." : "";
-    }
-    errs.email = validateEmail(email);
-    setFieldErrors(errs);
-    return !Object.values(errs).some(Boolean);
-  }
-
-  function clearFieldError(key) {
-    setFieldErrors((prev) => ({ ...prev, [key]: "" }));
-  }
-
-  async function submit(e) {
-    e.preventDefault();
-    setError("");
-    setNotice("");
-    if (!validateAll()) return;
-    setBusy(true);
-    // 온보딩 플래그는 가입 요청 "전"에 저장해야 함 —
-    // 가입 성공 시 세션 발급(App의 팝업 체크)이 응답보다 먼저 일어나기 때문
-    if (mode === "signup") {
-      localStorage.setItem("absolid.onboarding.v1", "pending");
-    }
-    const fn =
-      mode === "signup"
-        ? () =>
-            signUp(
-              email.trim(),
-              password,
-              nickname,
-              fullName.trim(),
-              formatPhone(phone),
-            )
-        : () => signIn(email.trim(), password);
-    const res = await fn();
-    setBusy(false);
-    if (res?.error) {
-      if (mode === "signup") {
-        localStorage.removeItem("absolid.onboarding.v1"); // 가입 실패 시 롤백
-      }
-      setError(res.error);
-      return;
-    }
-    if (mode === "signup" && !res?.data?.session) {
-      setNotice(
-        "가입 확인 메일을 보냈어요. 메일함에서 인증 후 로그인해 주세요.",
-      );
-    }
-  }
-
-  return (
-    <Card>
-      <CardTitle>{mode === "signup" ? "회원가입" : "로그인"}</CardTitle>
-      <Sub className="mt-1.5">
-        회원이 되면 기록이 계정에 저장되고, 그룹 만들기·사진 업로드를 쓸 수
-        있어요.
-      </Sub>
-      <form onSubmit={submit} noValidate>
-        {mode === "signup" && (
-          <>
-            <Field
-              id="name"
-              label="이름"
-              required
-              value={fullName}
-              maxLength={20}
-              placeholder="홍길동"
-              autoComplete="name"
-              error={fieldErrors.fullName}
-              onBlur={() =>
-                setFieldErrors((p) => ({
-                  ...p,
-                  fullName: fullName ? validateName(fullName) : "",
-                }))
-              }
-              onChange={(e) => {
-                setFullName(e.target.value);
-                clearFieldError("fullName");
-              }}
-            />
-            <Field
-              id="phone"
-              label="전화번호"
-              type="tel"
-              required
-              value={phone}
-              maxLength={13}
-              placeholder="010-0000-0000"
-              autoComplete="tel"
-              inputMode="numeric"
-              error={fieldErrors.phone}
-              onBlur={() =>
-                setFieldErrors((p) => ({
-                  ...p,
-                  phone: phone ? validatePhone(phone) : "",
-                }))
-              }
-              onChange={(e) => {
-                setPhone(formatPhone(e.target.value));
-                clearFieldError("phone");
-              }}
-            />
-          </>
-        )}
-        <Field
-          id="email"
-          label="이메일"
-          type="email"
-          required
-          value={email}
-          placeholder="name@example.com"
-          autoComplete="email"
-          error={fieldErrors.email}
-          onBlur={() =>
-            setFieldErrors((p) => ({
-              ...p,
-              email: email ? validateEmail(email) : "",
-            }))
-          }
-          onChange={(e) => {
-            setEmail(e.target.value);
-            clearFieldError("email");
-          }}
-        />
-        <Field
-          id="pw"
-          label={mode === "signup" ? "비밀번호 (6자 이상, 영문+숫자)" : "비밀번호"}
-          type="password"
-          required
-          minLength={6}
-          value={password}
-          autoComplete={mode === "signup" ? "new-password" : "current-password"}
-          error={fieldErrors.password}
-          onBlur={() =>
-            mode === "signup" &&
-            setFieldErrors((p) => ({
-              ...p,
-              password: password ? validatePassword(password) : "",
-            }))
-          }
-          onChange={(e) => {
-            setPassword(e.target.value);
-            clearFieldError("password");
-          }}
-        />
-        {mode === "signin" && (
-          <LinkButton
-            type="button"
-            className="mt-2.5 underline"
-            disabled={resetBusy}
-            onClick={forgotPassword}
-          >
-            {resetBusy ? "메일 보내는 중…" : "비밀번호를 잊으셨나요?"}
-          </LinkButton>
-        )}
-        {mode === "signup" && (
-          <div className="mt-4 rounded-md border border-line bg-surface-2 px-3.5 py-3">
-            <label className="flex cursor-pointer items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                className="size-4 flex-none accent-brand"
-                checked={agreed}
-                onChange={(e) => {
-                  setAgreed(e.target.checked);
-                  clearFieldError("agreed");
-                }}
-              />
-              <span>개인정보 수집 및 이용에 동의합니다. (필수)</span>
-            </label>
-            <LinkButton
-              type="button"
-              className="mt-1.5 underline"
-              onClick={() => setShowPrivacy(true)}
-            >
-              자세히 보기
-            </LinkButton>
-            {fieldErrors.agreed && <FieldError>{fieldErrors.agreed}</FieldError>}
-          </div>
-        )}
-        {error && <Sub className="mt-2.5 text-brand">{error}</Sub>}
-        {notice && <Sub className="mt-2.5">{notice}</Sub>}
-        <Button type="submit" className="mt-3.5" disabled={busy}>
-          {busy ? "처리 중…" : mode === "signup" ? "가입하기" : "로그인"}
-        </Button>
-      </form>
-      <Button
-        variant="secondary"
-        className="mt-2.5"
-        onClick={() => {
-          setMode(mode === "signup" ? "signin" : "signup");
-          setError("");
-          setNotice("");
-          setFieldErrors({});
-          setAgreed(false);
-        }}
-      >
-        {mode === "signup" ? "이미 계정이 있나요? 로그인" : "회원가입"}
-      </Button>
-      {showPrivacy && <PrivacyModal onClose={() => setShowPrivacy(false)} />}
-    </Card>
-  );
-}
-
 // ── 회원 탈퇴 모달 (비밀번호 재확인 필수) ───────
 function DeleteAccountModal({ email, onClose }) {
   const [pw, setPw] = useState("");
@@ -811,51 +535,6 @@ function DeleteAccountModal({ email, onClose }) {
       </Button>
       <Button variant="secondary" className="mt-2.5" disabled={busy} onClick={onClose}>
         취소
-      </Button>
-    </Modal>
-  );
-}
-
-// ── 개인정보 처리 동의 전문 모달 ───────────────
-function PrivacyModal({ onClose }) {
-  return (
-    <Modal label="개인정보 처리 동의" onBackdrop={onClose} className="max-h-[80dvh] overflow-y-auto">
-      <ModalTitle>개인정보 처리 동의 (필수)</ModalTitle>
-      <div className="mt-3.5 text-sm text-dim [&_li]:mt-1 [&_strong]:mt-3.5 [&_strong]:block [&_strong]:text-fg [&_ul]:mt-1.5 [&_ul]:ml-4.5 [&_ul]:list-disc [&>p]:mt-2">
-        <p>
-          본 서비스는 회원가입 및 운동 기록 관리 서비스를 제공하기 위해
-          아래와 같이 개인정보를 수집·이용합니다.
-        </p>
-        <strong>수집 항목</strong>
-        <ul>
-          <li>이메일</li>
-          <li>이름</li>
-          <li>전화번호</li>
-          <li>닉네임</li>
-          <li>비밀번호(암호화 저장)</li>
-          <li>프로필 사진 · 인증샷(선택 업로드)</li>
-          <li>운동 기록(사용자가 직접 입력한 정보)</li>
-        </ul>
-        <strong>이용 목적</strong>
-        <ul>
-          <li>회원 식별 및 로그인</li>
-          <li>운동 기록 저장 및 조회</li>
-          <li>서비스 운영 및 오류 대응</li>
-        </ul>
-        <strong>보관 기간</strong>
-        <ul>
-          <li>
-            회원 탈퇴 시까지 보관하며, 관련 법령에 따라 보관이 필요한 경우
-            해당 기간 동안 보관합니다.
-          </li>
-        </ul>
-        <p>
-          이용자는 개인정보 수집 및 이용에 대한 동의를 거부할 수 있으나,
-          동의하지 않을 경우 회원가입이 제한됩니다.
-        </p>
-      </div>
-      <Button variant="secondary" className="mt-4" onClick={onClose}>
-        닫기
       </Button>
     </Modal>
   );

@@ -7,6 +7,20 @@ export const cx = extendTailwindMerge({
   extend: { theme: { text: ['2xs', 'md', 'display'] } },
 })
 
+// ── 로고 ─────────────────────────────────────
+export function Logo({ size = 26, className }) {
+  return (
+    <span className={cx('flex items-center gap-2', className)}>
+      <svg width={size} height={size} viewBox="0 0 26 26" fill="none" aria-hidden="true">
+        <rect x="1" y="1" width="24" height="24" rx="7" fill="var(--color-brand)" />
+        <path d="M8 18 L13 7 L18 18" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M10 14.5 H16" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" />
+      </svg>
+      <strong className="font-extrabold tracking-tight">Abs<em className="text-brand not-italic">olid</em></strong>
+    </span>
+  )
+}
+
 // ── 레이아웃 ─────────────────────────────────
 export function Page({ className, ...props }) {
   return <main className={cx('flex-1 px-5 pt-2 pb-6', className)} {...props} />
