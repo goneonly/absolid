@@ -50,6 +50,7 @@ export default function Settings({ session, onChanged, isAdmin, onOpenAdmin }) {
   const [nickname, setNickname] = useState(getProfile().nickname);
   const [nickError, setNickError] = useState("");
   const [saved, setSaved] = useState(false);
+  const [askExport, setAskExport] = useState(false);
 
   async function save() {
     const err = validateNickname(nickname);
@@ -140,7 +141,7 @@ export default function Settings({ session, onChanged, isAdmin, onOpenAdmin }) {
       <p className="sub">
         {session
           ? `${session.user.email} 계정으로 이용 중이에요.`
-          : "지금은 비회원(기기 저장) 모드예요."}
+          : "비회원 모드예요 (기기 저장)"}
       </p>
 
       <section className="card">
@@ -182,7 +183,7 @@ export default function Settings({ session, onChanged, isAdmin, onOpenAdmin }) {
           기타
         </div>
         <PushToggleRow session={session} />
-        <button className="row-btn" onClick={exportCSV}>
+        <button className="row-btn" onClick={() => setAskExport(true)}>
           기록 내보내기 (CSV){" "}
           <span className="hint">구글시트에서 열기 가능</span>
         </button>
@@ -222,6 +223,40 @@ export default function Settings({ session, onChanged, isAdmin, onOpenAdmin }) {
           GitHub
         </a>
       </div>
+
+      {askExport && (
+        <div className="modal-backdrop" onClick={() => setAskExport(false)}>
+          <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="기록 내보내기"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3>기록 내보내기 📄</h3>
+            <p className="sub" style={{ marginTop: 8 }}>
+              CSV를 다운로드 받겠습니까?
+            </p>
+            <button
+              className="cta"
+              style={{ marginTop: 18 }}
+              onClick={() => {
+                setAskExport(false);
+                exportCSV();
+              }}
+            >
+              네
+            </button>
+            <button
+              className="cta secondary"
+              style={{ marginTop: 10 }}
+              onClick={() => setAskExport(false)}
+            >
+              아니오
+            </button>
+          </div>
+        </div>
+      )}
 
       {askResetPw && (
         <div className="modal-backdrop">
