@@ -15,6 +15,11 @@ import {
   setPlaylistId,
 } from "../admin.js";
 import { toast } from "../toast.js";
+import { Button, Card, CardTitle, Input, MiniButton, Page, PageTitle, Pill, Sub, cx } from "../components/ui.jsx";
+
+const ADMIN_ROW = "flex items-center gap-2.5 border-b border-line py-3 last:border-b-0";
+const ROW_TITLE = "truncate text-base font-semibold";
+const THUMB = "size-14 flex-none rounded-md border border-line bg-surface-2 object-cover";
 
 function fmtBytes(n) {
   if (!n) return "0 MB";
@@ -24,9 +29,9 @@ function fmtBytes(n) {
 
 export default function Admin({ onBack }) {
   return (
-    <main className="page">
-      <h2>관리자</h2>
-      <p className="sub">서비스 현황을 확인하고 회원·그룹·신고를 관리해요.</p>
+    <Page>
+      <PageTitle>관리자</PageTitle>
+      <Sub>서비스 현황을 확인하고 회원·그룹·신고를 관리해요.</Sub>
 
       <StatsSection />
       <ReportsSection />
@@ -35,10 +40,10 @@ export default function Admin({ onBack }) {
       <AnnouncementsSection />
       <ProgramSection />
 
-      <button className="cta secondary" style={{ marginTop: 20 }} onClick={onBack}>
+      <Button variant="secondary" className="mt-5" onClick={onBack}>
         ← 설정으로 돌아가기
-      </button>
-    </main>
+      </Button>
+    </Page>
   );
 }
 
@@ -53,9 +58,9 @@ function StatsSection() {
 
   if (error)
     return (
-      <section className="card">
-        <p className="sub" style={{ color: "var(--red)" }}>{error}</p>
-      </section>
+      <Card>
+        <Sub className="text-brand">{error}</Sub>
+      </Card>
     );
 
   const items = stats
@@ -72,21 +77,21 @@ function StatsSection() {
     : [];
 
   return (
-    <section className="card">
-      <div style={{ fontWeight: 700, fontSize: 15 }}>대시보드</div>
+    <Card>
+      <CardTitle>대시보드</CardTitle>
       {stats ? (
-        <div className="stat-grid">
+        <div className="mt-3.5 grid grid-cols-2 gap-2">
           {items.map(([label, value]) => (
-            <div className="stat" key={label}>
-              <div className="stat-value">{value}</div>
-              <div className="stat-label">{label}</div>
+            <div className="rounded-md border border-line bg-surface-2 p-3 text-center" key={label}>
+              <div className="text-xl font-extrabold">{value}</div>
+              <div className="mt-1 text-2xs text-dim">{label}</div>
             </div>
           ))}
         </div>
       ) : (
-        <p className="sub" style={{ marginTop: 6 }}>불러오는 중…</p>
+        <Sub className="mt-1.5">불러오는 중…</Sub>
       )}
-    </section>
+    </Card>
   );
 }
 
@@ -117,41 +122,41 @@ function ReportsSection() {
   }
 
   return (
-    <section className="card">
-      <div style={{ fontWeight: 700, fontSize: 15 }}>신고 처리</div>
+    <Card>
+      <CardTitle>신고 처리</CardTitle>
       {!loaded ? (
-        <p className="sub" style={{ marginTop: 6 }}>불러오는 중…</p>
+        <Sub className="mt-1.5">불러오는 중…</Sub>
       ) : reports.length === 0 ? (
-        <p className="sub" style={{ marginTop: 6 }}>미처리 신고가 없어요. 👍</p>
+        <Sub className="mt-1.5">미처리 신고가 없어요. 👍</Sub>
       ) : (
         reports.map((r) => (
-          <div className="admin-row" key={r.id}>
+          <div className={ADMIN_ROW} key={r.id}>
             {r.photoUrl ? (
-              <img className="report-thumb" src={r.photoUrl} alt="신고된 인증샷" />
+              <img className={THUMB} src={r.photoUrl} alt="신고된 인증샷" />
             ) : (
-              <div className="report-thumb empty">삭제됨</div>
+              <div className={cx(THUMB, "flex items-center justify-center text-2xs text-dim")}>삭제됨</div>
             )}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="admin-row-title">
-                {r.targetName} <span className="sub">({r.target_date})</span>
+            <div className="min-w-0 flex-1">
+              <div className={ROW_TITLE}>
+                {r.targetName} <span className="text-base text-dim">({r.target_date})</span>
               </div>
-              <div className="sub" style={{ fontSize: 12 }}>
+              <div className="text-xs text-dim">
                 신고자: {r.reporterName}
                 {r.reason && <> · 사유: {r.reason}</>}
               </div>
-              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                <button className="mini-btn danger" onClick={() => handle(r, "remove")}>
+              <div className="mt-2 flex gap-2">
+                <MiniButton danger onClick={() => handle(r, "remove")}>
                   사진 삭제
-                </button>
-                <button className="mini-btn" onClick={() => handle(r, "dismiss")}>
+                </MiniButton>
+                <MiniButton onClick={() => handle(r, "dismiss")}>
                   기각
-                </button>
+                </MiniButton>
               </div>
             </div>
           </div>
         ))
       )}
-    </section>
+    </Card>
   );
 }
 
@@ -185,45 +190,44 @@ function UsersSection() {
   }
 
   return (
-    <section className="card">
-      <div style={{ fontWeight: 700, fontSize: 15 }}>회원 관리</div>
-      <input
-        className="input"
-        style={{ marginTop: 12 }}
+    <Card>
+      <CardTitle>회원 관리</CardTitle>
+      <Input
+        className="mt-3"
         placeholder="닉네임·이름·전화번호 검색"
         value={query}
         onChange={(e) => { setQuery(e.target.value); load(e.target.value); }}
       />
       {!loaded ? (
-        <p className="sub" style={{ marginTop: 6 }}>불러오는 중…</p>
+        <Sub className="mt-1.5">불러오는 중…</Sub>
       ) : users.length === 0 ? (
-        <p className="sub" style={{ marginTop: 10 }}>결과가 없어요.</p>
+        <Sub className="mt-2.5">결과가 없어요.</Sub>
       ) : (
         users.map((u) => (
-          <div className="admin-row" key={u.id}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="admin-row-title">
+          <div className={ADMIN_ROW} key={u.id}>
+            <div className="min-w-0 flex-1">
+              <div className={ROW_TITLE}>
                 {u.nickname || "닉네임 없음"}
-                {u.role === "admin" && <span className="pill">관리자</span>}
-                {!u.is_active && <span className="pill danger">비활성</span>}
+                {u.role === "admin" && <Pill>관리자</Pill>}
+                {!u.is_active && <Pill danger>비활성</Pill>}
               </div>
-              <div className="sub" style={{ fontSize: 12 }}>
+              <div className="text-xs text-dim">
                 {u.full_name || "이름 미등록"}
                 {u.phone && <> · {u.phone}</>}
               </div>
             </div>
             {u.role !== "admin" && (
-              <button
-                className={"mini-btn" + (u.is_active ? " danger" : "")}
+              <MiniButton
+                danger={u.is_active}
                 onClick={() => toggleActive(u)}
               >
                 {u.is_active ? "비활성" : "활성화"}
-              </button>
+              </MiniButton>
             )}
           </div>
         ))
       )}
-    </section>
+    </Card>
   );
 }
 
@@ -253,27 +257,27 @@ function GroupsSection() {
   }
 
   return (
-    <section className="card">
-      <div style={{ fontWeight: 700, fontSize: 15 }}>그룹 관리</div>
+    <Card>
+      <CardTitle>그룹 관리</CardTitle>
       {!loaded ? (
-        <p className="sub" style={{ marginTop: 6 }}>불러오는 중…</p>
+        <Sub className="mt-1.5">불러오는 중…</Sub>
       ) : groups.length === 0 ? (
-        <p className="sub" style={{ marginTop: 6 }}>그룹이 없어요.</p>
+        <Sub className="mt-1.5">그룹이 없어요.</Sub>
       ) : (
         groups.map((g) => (
-          <div className="admin-row" key={g.id}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="admin-row-title">{g.name}</div>
-              <div className="sub" style={{ fontSize: 12 }}>
+          <div className={ADMIN_ROW} key={g.id}>
+            <div className="min-w-0 flex-1">
+              <div className={ROW_TITLE}>{g.name}</div>
+              <div className="text-xs text-dim">
                 {g.invite_code} · {g.memberCount}/{g.max_members}명
-                {g.memberCount === 0 && <span className="pill danger">빈 그룹</span>}
+                {g.memberCount === 0 && <Pill danger>빈 그룹</Pill>}
               </div>
             </div>
-            <button className="mini-btn danger" onClick={() => remove(g)}>해산</button>
+            <MiniButton danger onClick={() => remove(g)}>해산</MiniButton>
           </div>
         ))
       )}
-    </section>
+    </Card>
   );
 }
 
@@ -323,38 +327,37 @@ function AnnouncementsSection() {
   }
 
   return (
-    <section className="card">
-      <div style={{ fontWeight: 700, fontSize: 15 }}>공지</div>
-      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-        <input
-          className="input"
-          style={{ flex: 1 }}
+    <Card>
+      <CardTitle>공지</CardTitle>
+      <div className="mt-3 flex gap-2">
+        <Input
+          className="flex-1"
           placeholder="홈 배너에 띄울 공지 내용"
           maxLength={100}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
         />
-        <button className="mini-btn" onClick={add} disabled={busy || !message.trim()}>
+        <MiniButton onClick={add} disabled={busy || !message.trim()}>
           등록
-        </button>
+        </MiniButton>
       </div>
       {list.map((a) => (
-        <div className="admin-row" key={a.id}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="admin-row-title" style={{ opacity: a.active ? 1 : 0.5 }}>
+        <div className={ADMIN_ROW} key={a.id}>
+          <div className="min-w-0 flex-1">
+            <div className={cx(ROW_TITLE, !a.active && "opacity-50")}>
               {a.message}
             </div>
-            <div className="sub" style={{ fontSize: 12 }}>
+            <div className="text-xs text-dim">
               {a.active ? "게시 중" : "숨김"}
             </div>
           </div>
-          <button className="mini-btn" onClick={() => toggle(a)}>
+          <MiniButton onClick={() => toggle(a)}>
             {a.active ? "숨기기" : "게시"}
-          </button>
-          <button className="mini-btn danger" onClick={() => remove(a)}>삭제</button>
+          </MiniButton>
+          <MiniButton danger onClick={() => remove(a)}>삭제</MiniButton>
         </div>
       ))}
-    </section>
+    </Card>
   );
 }
 
@@ -380,22 +383,21 @@ function ProgramSection() {
   }
 
   return (
-    <section className="card">
-      <div style={{ fontWeight: 700, fontSize: 15 }}>운동 프로그램</div>
-      <p className="sub" style={{ marginTop: 6 }}>
+    <Card>
+      <CardTitle>운동 프로그램</CardTitle>
+      <Sub className="mt-1.5">
         YouTube 플레이리스트 ID (Day 1~30 순서의 30개 영상)
-      </p>
-      <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-        <input
-          className="input"
-          style={{ flex: 1 }}
+      </Sub>
+      <div className="mt-2.5 flex gap-2">
+        <Input
+          className="flex-1"
           value={value}
           onChange={(e) => setValue(e.target.value)}
         />
-        <button className="mini-btn" onClick={save} disabled={busy || !value.trim()}>
+        <MiniButton onClick={save} disabled={busy || !value.trim()}>
           저장
-        </button>
+        </MiniButton>
       </div>
-    </section>
+    </Card>
   );
 }

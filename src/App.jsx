@@ -5,6 +5,7 @@ import Group from './pages/Group.jsx'
 import Settings from './pages/Settings.jsx'
 import Admin from './pages/Admin.jsx'
 import BottomNav from './components/BottomNav.jsx'
+import { Page, PageTitle, Sub } from './components/ui.jsx'
 import OnboardingModal from './components/OnboardingModal.jsx'
 import PushConsentModal from './components/PushConsentModal.jsx'
 import RecoveryModal from './components/RecoveryModal.jsx'
@@ -87,17 +88,17 @@ export default function App() {
   }, [session, refresh])
 
   return (
-    <div className="app">
-      <header className="header">
-        <button className="logo" onClick={() => setView('home')} aria-label="홈으로">
+    <div className="flex min-h-dvh flex-col pb-22">
+      <header className="flex items-center justify-between px-5 pt-4.5 pb-2.5">
+        <button className="flex items-center gap-2" onClick={() => setView('home')} aria-label="홈으로">
           <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
-            <rect x="1" y="1" width="24" height="24" rx="7" fill="#ff3b30" />
+            <rect x="1" y="1" width="24" height="24" rx="7" fill="var(--color-brand)" />
             <path d="M8 18 L13 7 L18 18" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
             <path d="M10 14.5 H16" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" />
           </svg>
-          <strong>Abs<em>olid</em></strong>
+          <strong className="text-xl font-extrabold tracking-tight">Abs<em className="text-brand not-italic">olid</em></strong>
         </button>
-        {session && <span className="tag">로그인됨</span>}
+        {session && <span className="rounded-sm bg-surface-2 px-2 py-0.5 text-2xs font-bold text-dim">로그인됨</span>}
       </header>
 
       {view === 'home' && <Home records={records} onStart={() => setView('workout')} />}
@@ -106,7 +107,7 @@ export default function App() {
       {view === 'settings' && <Settings session={session} onChanged={refresh} isAdmin={isAdmin} onOpenAdmin={() => setView('admin')} />}
       {view === 'admin' && (isAdmin
         ? <Admin onBack={() => setView('settings')} />
-        : <main className="page"><h2>관리자</h2><p className="sub">접근 권한이 없어요.</p></main>)}
+        : <Page><PageTitle>관리자</PageTitle><Sub>접근 권한이 없어요.</Sub></Page>)}
 
       {showOnboarding && (
         <OnboardingModal

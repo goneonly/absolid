@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { Button, Modal, ModalText, ModalTitle } from './ui.jsx'
 
 // 사진을 긴 변 720px 이하 JPEG dataURL로 압축 (localStorage 용량 보호)
 function compressImage(file) {
@@ -31,23 +32,24 @@ export default function CompleteModal({ day, onSave, onSkip }) {
   }
 
   return (
-    <div className="modal-backdrop">
-      <div className="modal" role="dialog" aria-modal="true">
-        <h3>🎉 Day {day} 운동 완료!</h3>
-        <p className="sub">오늘의 인증샷을 남겨볼까요? (선택)</p>
+    <Modal>
+      <ModalTitle>🎉 Day {day} 운동 완료!</ModalTitle>
+      <ModalText>오늘의 인증샷을 남겨볼까요? (선택)</ModalText>
 
-        <button className="photo-box" onClick={() => fileRef.current?.click()}>
-          {photo ? <img src={photo} alt="인증샷 미리보기" /> : '📷 탭하여 사진 첨부'}
-        </button>
-        <input ref={fileRef} type="file" accept="image/*" hidden onChange={handleFile} />
+      <button
+        className="mt-4.5 flex min-h-50 w-full items-center justify-center overflow-hidden rounded-lg border-[1.5px] border-dashed border-line bg-surface-2 text-center text-lg font-semibold text-dim"
+        onClick={() => fileRef.current?.click()}
+      >
+        {photo ? <img className="block w-full" src={photo} alt="인증샷 미리보기" /> : '📷 탭하여 사진 첨부'}
+      </button>
+      <input ref={fileRef} type="file" accept="image/*" hidden onChange={handleFile} />
 
-        <button className="cta" onClick={() => onSave(photo)}>
-          {photo ? '사진과 함께 업로드' : '완료 기록하기'}
-        </button>
-        <button className="cta secondary" style={{ marginTop: 10 }} onClick={onSkip}>
-          사진 없이 완료
-        </button>
-      </div>
-    </div>
+      <Button className="mt-5" onClick={() => onSave(photo)}>
+        {photo ? '사진과 함께 업로드' : '완료 기록하기'}
+      </Button>
+      <Button variant="secondary" className="mt-2.5" onClick={onSkip}>
+        사진 없이 완료
+      </Button>
+    </Modal>
   )
 }

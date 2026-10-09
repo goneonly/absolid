@@ -5,6 +5,7 @@ import { todayWorkoutDay, todayKey, saveRecord } from "../storage.js";
 import CompleteModal from "../components/CompleteModal.jsx";
 import { pushRecord, uploadPhoto } from "../api.js";
 import { toast } from "../toast.js";
+import { Button, Card, CardTitle, Page, PageTitle, Sub } from "../components/ui.jsx";
 
 const FINISH_RATIO = 0.8; // 영상 80% 이상 시청 시 수동 완료 버튼 활성화
 
@@ -117,37 +118,40 @@ export default function Workout({ onDone, session }) {
   }
 
   return (
-    <main className="page">
-      <h2>Day {day} 복근 운동</h2>
-      <p className="sub">영상이 끝나면 자동으로 운동 완료 처리돼요.</p>
+    <Page>
+      <PageTitle>Day {day} 복근 운동</PageTitle>
+      <Sub>영상이 끝나면 자동으로 운동 완료 처리돼요.</Sub>
 
-      <div className="hero">
-        <span className="day-chip">DAY {day}</span>
-        <div className="ratio">
-          <div className="yt-holder" ref={holderRef} />
+      <div className="relative -mx-5 mt-4 bg-black">
+        <span className="pointer-events-none absolute top-3 left-3 z-2 rounded-full bg-brand px-3 py-1 text-sm font-extrabold text-white">
+          DAY {day}
+        </span>
+        {/* YouTube API가 holder div를 iframe으로 교체하므로 자식 iframe에도 같은 배치 적용 */}
+        <div className="relative aspect-video w-full [&>*]:absolute [&>*]:inset-0 [&>*]:size-full">
+          <div ref={holderRef} />
         </div>
       </div>
 
-      <section className="card workout-note">
-        <div style={{ fontWeight: 700, fontSize: 15 }}>오늘의 루틴</div>
-        <p className="sub" style={{ marginTop: 6 }}>
+      <Card>
+        <CardTitle>오늘의 루틴</CardTitle>
+        <Sub className="mt-1.5">
           중간에 나가면 완료로 기록되지 않아요. 끝까지 함께해요! 💪
-        </p>
-      </section>
+        </Sub>
+      </Card>
 
       {canFinish && (
-        <button className="cta" onClick={finish}>
+        <Button className="mt-5" onClick={finish}>
           운동 완료
-        </button>
+        </Button>
       )}
 
       {import.meta.env.DEV && (
-        <button className="demo-link" onClick={finish}>
+        <button className="mx-auto mt-5 block text-xs text-dim underline" onClick={finish}>
           (개발용) 영상 끝까지 본 것으로 처리하기
         </button>
       )}
 
-      <p className="copyright"> © XYZ Fitness - 30 days six pack abs</p>
+      <p className="mt-6 text-center text-2xs text-dim opacity-80"> © XYZ Fitness - 30 days six pack abs</p>
 
       {showModal && (
         <CompleteModal
@@ -156,6 +160,6 @@ export default function Workout({ onDone, session }) {
           onSkip={() => handleSave(null)}
         />
       )}
-    </main>
+    </Page>
   );
 }

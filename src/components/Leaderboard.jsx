@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { todayKey } from '../storage.js'
 import { fetchGroupWorkoutDates } from '../api.js'
+import { Card, CardTitle, Input, MemberAvatar, Sub, cx } from './ui.jsx'
 
 const PERIODS = [
   { key: 'week', label: '이번 주' },
@@ -73,20 +74,6 @@ function rankRows(members, dateSets, myId, records, startKey, endKey) {
   return rows
 }
 
-function Avatar({ name, avatar, top }) {
-  return (
-    <span className={'member-avatar' + (top ? ' done' : '')}>
-      {avatar ? (
-        <img src={avatar} alt={`${name} 프로필 사진`} loading="lazy" />
-      ) : (
-        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Zm0 2c-4.2 0-8 2.2-8 5.4V21h16v-1.6c0-3.2-3.8-5.4-8-5.4Z" />
-        </svg>
-      )}
-    </span>
-  )
-}
-
 export default function Leaderboard({ members, myId, myName, records }) {
   const [period, setPeriod] = useState('week')
   const [cs, setCs] = useState('')
@@ -129,19 +116,22 @@ export default function Leaderboard({ members, myId, myName, records }) {
   const me = rows?.find(r => r.id === myId)
 
   return (
-    <section className="card">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ fontWeight: 700, fontSize: 15 }}>리더보드 🏆</div>
-        <span className="sub" style={{ fontSize: 11 }}>
+    <Card>
+      <div className="flex items-center justify-between">
+        <CardTitle>리더보드 🏆</CardTitle>
+        <span className="text-2xs text-dim">
           {startKey.slice(5).replace('-', '.')} ~ {endKey.slice(5).replace('-', '.')}
         </span>
       </div>
 
-      <div className="lb-tabs">
+      <div className="mt-3 flex flex-wrap gap-1.5">
         {PERIODS.map(p => (
           <button
             key={p.key}
-            className={'lb-tab' + (period === p.key ? ' on' : '')}
+            className={cx(
+              'rounded-full border px-3 py-1.5 text-xs font-semibold',
+              period === p.key ? 'border-brand/40 bg-brand/15 text-brand' : 'border-line bg-surface-2 text-dim',
+            )}
             onClick={() => setPeriod(p.key)}
           >
             {p.label}
@@ -150,61 +140,64 @@ export default function Leaderboard({ members, myId, myName, records }) {
       </div>
 
       {period === 'custom' && (
-        <div className="lb-custom">
-          <input type="date" className="input" value={cs} max={todayKey()}
+        <div className="mt-2.5 flex items-center gap-2">
+          <Input type="date" className="flex-1 px-2.5 py-2 text-sm" value={cs} max={todayKey()}
             onChange={e => setCs(e.target.value)} aria-label="시작 날짜" />
-          <span className="sub">~</span>
-          <input type="date" className="input" value={ce} max={todayKey()}
+          <Sub>~</Sub>
+          <Input type="date" className="flex-1 px-2.5 py-2 text-sm" value={ce} max={todayKey()}
             onChange={e => setCe(e.target.value)} aria-label="끝 날짜" />
         </div>
       )}
 
       {!rows || (loading && !cur) ? (
-        <p className="sub" style={{ marginTop: 12 }}>집계 중…</p>
+        <Sub className="mt-3">집계 중…</Sub>
       ) : (
         <>
           {me && (
-            <div className="lb-me">
-              내 순위 <strong>{me.rank}위</strong> · 인증 {me.count}회
+            <div className="mt-3 rounded-md border border-brand/30 bg-brand/12 px-3.5 py-2.5 text-sm">
+              내 순위 <strong className="text-md text-brand">{me.rank}위</strong> · 인증 {me.count}회
               {me.delta !== 0 && (
-                <span className={'lb-delta ' + (me.delta > 0 ? 'up' : 'down')} style={{ marginLeft: 6 }}>
+                <span className={cx('ml-1.5 text-2xs font-bold', me.delta > 0 ? 'text-success' : 'text-dim')}>
                   {me.delta > 0 ? `▲${me.delta}` : `▼${-me.delta}`}
                 </span>
               )}
             </div>
           )}
 
-          <div style={{ marginTop: 4 }}>
-            {rows.map(r => (
-              <div key={r.id} className={'lb-row' + (r.id === myId ? ' me' : '')}>
-                <span className={'lb-rank' + (r.rank <= 3 && r.count > 0 ? ' medal' : '')}>
-                  {r.rank <= 3 && r.count > 0 ? MEDALS[r.rank - 1] : r.rank}
-                </span>
-                <Avatar name={r.name} avatar={r.avatar} top={r.rank === 1 && r.count > 0} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <span className="name" style={{ fontSize: 14 }}>
-                    {r.id === myId ? (myName || r.name) : r.name}
-                    {r.id === myId ? ' (나)' : ''}
+          <div className="mt-1">
+            {rows.map(r => {
+              const medal = r.rank <= 3 && r.count > 0
+              return (
+                <div key={r.id} className="flex items-center gap-2.5 border-b border-line py-3 last:border-b-0">
+                  <span className={cx('w-6.5 flex-none text-center font-extrabold text-dim', medal ? 'text-lg' : 'text-sm')}>
+                    {medal ? MEDALS[r.rank - 1] : r.rank}
                   </span>
-                  <div className="lb-bar">
-                    <i style={{ width: `${Math.min(100, (r.count / totalDays) * 100)}%` }} />
+                  <MemberAvatar name={r.name} avatar={r.avatar} active={r.rank === 1 && r.count > 0} />
+                  <div className="min-w-0 flex-1">
+                    <span className={cx('text-base font-semibold', r.id === myId && 'text-brand')}>
+                      {r.id === myId ? (myName || r.name) : r.name}
+                      {r.id === myId ? ' (나)' : ''}
+                    </span>
+                    <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-surface-2">
+                      <i className="block h-full rounded-full bg-brand transition-[width] duration-300" style={{ width: `${Math.min(100, (r.count / totalDays) * 100)}%` }} />
+                    </div>
                   </div>
+                  <span className={cx('w-7.5 flex-none text-right text-2xs font-bold', r.delta > 0 ? 'text-success' : r.delta < 0 ? 'text-dim' : 'text-dot')}>
+                    {r.delta > 0 ? `▲${r.delta}` : r.delta < 0 ? `▼${-r.delta}` : '—'}
+                  </span>
+                  <span className="w-10 flex-none text-right text-base font-extrabold">
+                    {r.count}<span className="ml-px text-2xs font-normal text-dim">회</span>
+                  </span>
                 </div>
-                <span className={'lb-delta ' + (r.delta > 0 ? 'up' : r.delta < 0 ? 'down' : '')}>
-                  {r.delta > 0 ? `▲${r.delta}` : r.delta < 0 ? `▼${-r.delta}` : '—'}
-                </span>
-                <span className="lb-count">
-                  {r.count}<span>회</span>
-                </span>
-              </div>
-            ))}
+              )
+            })}
           </div>
 
-          <p className="sub" style={{ fontSize: 11, marginTop: 10 }}>
+          <Sub className="mt-2.5 text-2xs">
             기간 내 인증 횟수 기준 · ▲▼는 직전 {totalDays}일 대비 순위 변동
-          </p>
+          </Sub>
         </>
       )}
-    </section>
+    </Card>
   )
 }

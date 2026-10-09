@@ -24,6 +24,8 @@ npm run build    # 배포용 빌드
 - `src/auth.js`, `src/useAuth.js` — 회원가입/로그인/세션
 - `src/api.js` — 운동 기록 서버 동기화
 - `supabase/schema.sql` — DB 테이블 + 보안 정책(RLS)
+- `src/index.css` — Tailwind CSS v4 디자인 토큰(색상·폰트 크기·라운드)
+- `src/components/ui.jsx` — 공통 UI 컴포넌트(Card, Button, Modal, Field 등)
 - `src/App.jsx` — 화면 전환(홈/운동/그룹/설정)
 - `src/pages/` — Home(streak), Workout(영상+완료감지), Group, Settings
 - `src/components/` — BottomNav(그룹|시작|설정), CompleteModal(사진 첨부)

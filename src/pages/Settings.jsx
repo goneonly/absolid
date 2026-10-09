@@ -19,6 +19,22 @@ import { uploadAvatar, deleteAvatar, resetServerWorkouts } from "../api.js";
 import { isPushSupported, getPushEnabled, enablePush, disablePush } from "../push.js";
 import { toast } from "../toast.js";
 import {
+  Button,
+  Card,
+  CardTitle,
+  Field,
+  FieldError,
+  LinkButton,
+  Modal,
+  ModalText,
+  ModalTitle,
+  Page,
+  PageTitle,
+  PersonIcon,
+  RowButton,
+  Sub,
+} from "../components/ui.jsx";
+import {
   validateEmail,
   validateName,
   validatePhone,
@@ -136,77 +152,61 @@ export default function Settings({ session, onChanged, isAdmin, onOpenAdmin }) {
   }
 
   return (
-    <main className="page">
-      <h2>설정</h2>
-      <p className="sub">
+    <Page>
+      <PageTitle>설정</PageTitle>
+      <Sub>
         {session
           ? `${session.user.email} 계정으로 이용 중이에요.`
           : "비회원 모드예요 (기기 저장)"}
-      </p>
+      </Sub>
 
-      <section className="card">
+      <Card>
         <ProfilePhoto
           nickname={nickname}
           session={session}
           onChanged={onChanged}
         />
-        <div style={{ fontWeight: 700, fontSize: 15, marginTop: 18 }}>
-          내 프로필
-        </div>
-        <div className="field">
-          <label htmlFor="nick">닉네임</label>
-          <input
-            id="nick"
-            value={nickname}
-            placeholder="그룹에 표시될 이름"
-            maxLength={12}
-            onChange={(e) => {
-              setNickname(e.target.value);
-              setNickError("");
-            }}
-          />
-          {nickError && <p className="field-error">{nickError}</p>}
-        </div>
-        <button
-          className="cta secondary"
-          style={{ marginTop: 14 }}
-          onClick={save}
-        >
+        <CardTitle className="mt-4.5">내 프로필</CardTitle>
+        <Field
+          id="nick"
+          label="닉네임"
+          value={nickname}
+          placeholder="그룹에 표시될 이름"
+          maxLength={12}
+          error={nickError}
+          onChange={(e) => {
+            setNickname(e.target.value);
+            setNickError("");
+          }}
+        />
+        <Button variant="secondary" className="mt-3.5" onClick={save}>
           {saved ? "저장됐어요 ✓" : "저장"}
-        </button>
-      </section>
+        </Button>
+      </Card>
 
       <AccountCard session={session} nickname={nickname} />
 
-      <section className="card">
-        <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>
-          기타
-        </div>
+      <Card>
+        <CardTitle className="mb-1.5">기타</CardTitle>
         <PushToggleRow session={session} />
-        <button className="row-btn" onClick={() => setAskExport(true)}>
-          기록 내보내기 (CSV){" "}
-          <span className="hint">구글시트에서 열기 가능</span>
-        </button>
-        <button className="row-btn danger" onClick={reset}>
-          운동 기록 초기화{" "}
-          <span className="hint">
-            {session ? "서버 포함 전체 삭제" : "이 기기"}
-          </span>
-        </button>
-      </section>
+        <RowButton hint="구글시트에서 열기 가능" onClick={() => setAskExport(true)}>
+          기록 내보내기 (CSV)
+        </RowButton>
+        <RowButton danger hint={session ? "서버 포함 전체 삭제" : "이 기기"} onClick={reset}>
+          운동 기록 초기화
+        </RowButton>
+      </Card>
 
       {isAdmin && (
-        <section className="card">
-          <button className="row-btn" onClick={onOpenAdmin}>
-            관리자 페이지 <span className="hint">회원·그룹·신고 관리</span>
-          </button>
-        </section>
+        <Card>
+          <RowButton hint="회원·그룹·신고 관리" onClick={onOpenAdmin}>
+            관리자 페이지
+          </RowButton>
+        </Card>
       )}
 
-      <p className="sub" style={{ marginTop: 16, textAlign: "center" }}>
-        Absolid v{__APP_VERSION__}
-      </p>
-      <div className="footer-links">
+      <Sub className="mt-4 text-center">Absolid v{__APP_VERSION__}</Sub>
+      <div className="mt-2 flex items-center justify-center gap-2.5 text-xs text-dim [&>a]:hover:text-fg [&>a]:hover:underline">
         <a
           href="https://www.linkedin.com/in/jiwon-han-380b29274/"
           target="_blank"
@@ -225,85 +225,62 @@ export default function Settings({ session, onChanged, isAdmin, onOpenAdmin }) {
       </div>
 
       {askExport && (
-        <div className="modal-backdrop" onClick={() => setAskExport(false)}>
-          <div
-            className="modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label="기록 내보내기"
-            onClick={(e) => e.stopPropagation()}
+        <Modal label="기록 내보내기" onBackdrop={() => setAskExport(false)}>
+          <ModalTitle>기록 내보내기 📄</ModalTitle>
+          <ModalText>CSV를 다운로드 받겠습니까?</ModalText>
+          <Button
+            className="mt-4.5"
+            onClick={() => {
+              setAskExport(false);
+              exportCSV();
+            }}
           >
-            <h3>기록 내보내기 📄</h3>
-            <p className="sub" style={{ marginTop: 8 }}>
-              CSV를 다운로드 받겠습니까?
-            </p>
-            <button
-              className="cta"
-              style={{ marginTop: 18 }}
-              onClick={() => {
-                setAskExport(false);
-                exportCSV();
-              }}
-            >
-              네
-            </button>
-            <button
-              className="cta secondary"
-              style={{ marginTop: 10 }}
-              onClick={() => setAskExport(false)}
-            >
-              아니오
-            </button>
-          </div>
-        </div>
+            네
+          </Button>
+          <Button variant="secondary" className="mt-2.5" onClick={() => setAskExport(false)}>
+            아니오
+          </Button>
+        </Modal>
       )}
 
       {askResetPw && (
-        <div className="modal-backdrop">
-          <div className="modal" role="dialog" aria-modal="true" aria-label="비밀번호 확인">
-            <h3>비밀번호 확인 🔒</h3>
-            <p className="sub" style={{ marginTop: 8 }}>
-              운동 기록 초기화는 되돌릴 수 없어요. 본인 확인을 위해 비밀번호를
-              입력해 주세요.
-            </p>
-            <div className="field" style={{ marginTop: 12 }}>
-              <label htmlFor="reset-pw">비밀번호</label>
-              <input
-                id="reset-pw"
-                type="password"
-                autoFocus
-                autoComplete="current-password"
-                value={resetPw}
-                onChange={(e) => {
-                  setResetPw(e.target.value);
-                  setResetPwError("");
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") verifyResetPw();
-                }}
-              />
-              {resetPwError && <p className="field-error">{resetPwError}</p>}
-            </div>
-            <button
-              className="cta"
-              style={{ marginTop: 14 }}
-              disabled={resetPwBusy}
-              onClick={verifyResetPw}
-            >
-              {resetPwBusy ? "확인 중…" : "확인"}
-            </button>
-            <button
-              className="cta secondary"
-              style={{ marginTop: 10 }}
-              disabled={resetPwBusy}
-              onClick={() => setAskResetPw(false)}
-            >
-              취소
-            </button>
-          </div>
-        </div>
+        <Modal label="비밀번호 확인">
+          <ModalTitle>비밀번호 확인 🔒</ModalTitle>
+          <ModalText>
+            운동 기록 초기화는 되돌릴 수 없어요. 본인 확인을 위해 비밀번호를
+            입력해 주세요.
+          </ModalText>
+          <Field
+            id="reset-pw"
+            label="비밀번호"
+            className="mt-3"
+            type="password"
+            autoFocus
+            autoComplete="current-password"
+            value={resetPw}
+            error={resetPwError}
+            onChange={(e) => {
+              setResetPw(e.target.value);
+              setResetPwError("");
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") verifyResetPw();
+            }}
+          />
+          <Button className="mt-3.5" disabled={resetPwBusy} onClick={verifyResetPw}>
+            {resetPwBusy ? "확인 중…" : "확인"}
+          </Button>
+          <Button
+            variant="secondary"
+            className="mt-2.5"
+            disabled={resetPwBusy}
+            onClick={() => setAskResetPw(false)}
+          >
+            취소
+          </Button>
+        </Modal>
       )}
-    </main>
+    </Page>
   );
 }
 
@@ -336,16 +313,12 @@ function ProfilePhoto({ nickname, session, onChanged }) {
   // 비회원은 기본 사진으로 고정
   if (!session) {
     return (
-      <div className="profile-hero">
-        <div className="avatar" aria-label="기본 프로필 사진">
-          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Zm0 2c-4.2 0-8 2.2-8 5.4V21h16v-1.6c0-3.2-3.8-5.4-8-5.4Z" />
-          </svg>
+      <div className="flex flex-col items-center pt-1.5">
+        <div className="relative flex size-24 items-center justify-center rounded-full border-2 border-line bg-surface-2 p-0 text-dot" aria-label="기본 프로필 사진">
+          <PersonIcon className="size-12" />
         </div>
-        <div className="profile-name">
-          {nickname?.trim() || "닉네임을 설정해 주세요"}
-        </div>
-        <div className="profile-email">
+        <ProfileName nickname={nickname} />
+        <div className="mt-1 text-xs text-dim">
           프로필 사진은 로그인 후 설정할 수 있어요
         </div>
       </div>
@@ -396,22 +369,24 @@ function ProfilePhoto({ nickname, session, onChanged }) {
   }
 
   return (
-    <div className="profile-hero">
+    <div className="flex flex-col items-center pt-1.5">
       <button
-        className="avatar"
+        className="relative flex size-24 items-center justify-center rounded-full border-2 border-line bg-surface-2 p-0 text-dot disabled:opacity-60"
         aria-label={avatar ? "프로필 사진 관리" : "프로필 사진 업로드"}
         disabled={busy}
         onClick={() => (avatar ? setShowSheet(true) : fileRef.current?.click())}
       >
         {avatar ? (
-          <img src={avatar} alt="프로필 사진" />
+          <img className="block size-full rounded-full object-cover" src={avatar} alt="프로필 사진" />
         ) : (
-          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Zm0 2c-4.2 0-8 2.2-8 5.4V21h16v-1.6c0-3.2-3.8-5.4-8-5.4Z" />
-          </svg>
+          <PersonIcon className="size-12" />
         )}
-        <span className="avatar-badge" aria-hidden="true">
+        <span
+          className="absolute -right-0.5 -bottom-0.5 flex size-7.5 items-center justify-center rounded-full border-3 border-surface bg-brand text-white"
+          aria-hidden="true"
+        >
           <svg
+            className="size-3.5"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -424,10 +399,8 @@ function ProfilePhoto({ nickname, session, onChanged }) {
           </svg>
         </span>
       </button>
-      <div className="profile-name">
-        {nickname?.trim() || "닉네임을 설정해 주세요"}
-      </div>
-      {session && <div className="profile-email">{session.user.email}</div>}
+      <ProfileName nickname={nickname} />
+      {session && <div className="mt-1 text-xs text-dim">{session.user.email}</div>}
 
       <input
         ref={fileRef}
@@ -438,40 +411,32 @@ function ProfilePhoto({ nickname, session, onChanged }) {
       />
 
       {showSheet && (
-        <div className="modal-backdrop" onClick={() => setShowSheet(false)}>
-          <div
-            className="modal"
-            role="dialog"
-            aria-modal="true"
-            onClick={(e) => e.stopPropagation()}
+        <Modal label="프로필 사진" onBackdrop={() => setShowSheet(false)}>
+          <ModalTitle>프로필 사진</ModalTitle>
+          <Button
+            variant="secondary"
+            className="mt-4.5"
+            disabled={busy}
+            onClick={() => fileRef.current?.click()}
           >
-            <h3>프로필 사진</h3>
-            <button
-              className="cta secondary"
-              style={{ marginTop: 18 }}
-              disabled={busy}
-              onClick={() => fileRef.current?.click()}
-            >
-              사진 교체
-            </button>
-            <button
-              className="cta secondary"
-              style={{ marginTop: 10, color: "var(--red)" }}
-              disabled={busy}
-              onClick={removePhoto}
-            >
-              사진 삭제
-            </button>
-            <button
-              className="cta secondary"
-              style={{ marginTop: 10 }}
-              onClick={() => setShowSheet(false)}
-            >
-              취소
-            </button>
-          </div>
-        </div>
+            사진 교체
+          </Button>
+          <Button variant="danger" className="mt-2.5" disabled={busy} onClick={removePhoto}>
+            사진 삭제
+          </Button>
+          <Button variant="secondary" className="mt-2.5" onClick={() => setShowSheet(false)}>
+            취소
+          </Button>
+        </Modal>
       )}
+    </div>
+  );
+}
+
+function ProfileName({ nickname }) {
+  return (
+    <div className="mt-3 text-lg font-bold">
+      {nickname?.trim() || "닉네임을 설정해 주세요"}
     </div>
   );
 }
@@ -509,12 +474,13 @@ function PushToggleRow({ session }) {
   }
 
   return (
-    <button className="row-btn" disabled={busy} onClick={toggle}>
-      운동 리마인더 알림{" "}
-      <span className="hint">
-        {busy ? "처리 중…" : enabled ? "켜짐 🔔" : "꺼짐 🔕"}
-      </span>
-    </button>
+    <RowButton
+      disabled={busy}
+      hint={busy ? "처리 중…" : enabled ? "켜짐 🔔" : "꺼짐 🔕"}
+      onClick={toggle}
+    >
+      운동 리마인더 알림
+    </RowButton>
   );
 }
 
@@ -553,48 +519,41 @@ function AccountCard({ session, nickname }) {
 
   if (!supabase) {
     return (
-      <section className="card">
-        <div style={{ fontWeight: 700, fontSize: 15 }}>계정</div>
-        <p className="sub" style={{ marginTop: 6 }}>
+      <Card>
+        <CardTitle>계정</CardTitle>
+        <Sub className="mt-1.5">
           서버(Supabase) 연결 대기 중이에요. 프로젝트 키를 연결하면
           로그인·회원가입이 열립니다. 연결 방법은 SUPABASE_SETUP.md 문서를
           참고해 주세요.
-        </p>
-      </section>
+        </Sub>
+      </Card>
     );
   }
 
   if (session) {
     return (
-      <section className="card">
-        <div style={{ fontWeight: 700, fontSize: 15 }}>계정</div>
-        <p className="sub" style={{ marginTop: 6 }}>
-          {session.user.email}
-        </p>
-        <p className="sub" style={{ marginTop: 4 }}>
+      <Card>
+        <CardTitle>계정</CardTitle>
+        <Sub className="mt-1.5">{session.user.email}</Sub>
+        <Sub className="mt-1">
           기록이 계정에 안전하게 저장돼요. 어느 기기서든 이어갈 수 있어요.
-        </p>
-        <button
-          className="cta secondary"
-          style={{ marginTop: 14 }}
-          onClick={() => signOut()}
-        >
+        </Sub>
+        <Button variant="secondary" className="mt-3.5" onClick={() => signOut()}>
           로그아웃
-        </button>
-        <button
-          className="linklike danger-link"
-          style={{ marginTop: 14, display: "block" }}
+        </Button>
+        <LinkButton
+          className="mt-3.5 block w-full text-center text-sm text-brand"
           onClick={() => setShowDelete(true)}
         >
           회원 탈퇴
-        </button>
+        </LinkButton>
         {showDelete && (
           <DeleteAccountModal
             email={session.user.email}
             onClose={() => setShowDelete(false)}
           />
         )}
-      </section>
+      </Card>
     );
   }
 
@@ -657,142 +616,116 @@ function AccountCard({ session, nickname }) {
   }
 
   return (
-    <section className="card">
-      <div style={{ fontWeight: 700, fontSize: 15 }}>
-        {mode === "signup" ? "회원가입" : "로그인"}
-      </div>
-      <p className="sub" style={{ marginTop: 6 }}>
+    <Card>
+      <CardTitle>{mode === "signup" ? "회원가입" : "로그인"}</CardTitle>
+      <Sub className="mt-1.5">
         회원이 되면 기록이 계정에 저장되고, 그룹 만들기·사진 업로드를 쓸 수
         있어요.
-      </p>
+      </Sub>
       <form onSubmit={submit} noValidate>
         {mode === "signup" && (
           <>
-            <div className="field">
-              <label htmlFor="name">이름</label>
-              <input
-                id="name"
-                required
-                value={fullName}
-                maxLength={20}
-                placeholder="홍길동"
-                autoComplete="name"
-                aria-invalid={!!fieldErrors.fullName}
-                onBlur={() =>
-                  setFieldErrors((p) => ({
-                    ...p,
-                    fullName: fullName ? validateName(fullName) : "",
-                  }))
-                }
-                onChange={(e) => {
-                  setFullName(e.target.value);
-                  clearFieldError("fullName");
-                }}
-              />
-              {fieldErrors.fullName && (
-                <p className="field-error">{fieldErrors.fullName}</p>
-              )}
-            </div>
-            <div className="field">
-              <label htmlFor="phone">전화번호</label>
-              <input
-                id="phone"
-                type="tel"
-                required
-                value={phone}
-                maxLength={13}
-                placeholder="010-0000-0000"
-                autoComplete="tel"
-                inputMode="numeric"
-                aria-invalid={!!fieldErrors.phone}
-                onBlur={() =>
-                  setFieldErrors((p) => ({
-                    ...p,
-                    phone: phone ? validatePhone(phone) : "",
-                  }))
-                }
-                onChange={(e) => {
-                  setPhone(formatPhone(e.target.value));
-                  clearFieldError("phone");
-                }}
-              />
-              {fieldErrors.phone && (
-                <p className="field-error">{fieldErrors.phone}</p>
-              )}
-            </div>
+            <Field
+              id="name"
+              label="이름"
+              required
+              value={fullName}
+              maxLength={20}
+              placeholder="홍길동"
+              autoComplete="name"
+              error={fieldErrors.fullName}
+              onBlur={() =>
+                setFieldErrors((p) => ({
+                  ...p,
+                  fullName: fullName ? validateName(fullName) : "",
+                }))
+              }
+              onChange={(e) => {
+                setFullName(e.target.value);
+                clearFieldError("fullName");
+              }}
+            />
+            <Field
+              id="phone"
+              label="전화번호"
+              type="tel"
+              required
+              value={phone}
+              maxLength={13}
+              placeholder="010-0000-0000"
+              autoComplete="tel"
+              inputMode="numeric"
+              error={fieldErrors.phone}
+              onBlur={() =>
+                setFieldErrors((p) => ({
+                  ...p,
+                  phone: phone ? validatePhone(phone) : "",
+                }))
+              }
+              onChange={(e) => {
+                setPhone(formatPhone(e.target.value));
+                clearFieldError("phone");
+              }}
+            />
           </>
         )}
-        <div className="field">
-          <label htmlFor="email">이메일</label>
-          <input
-            id="email"
-            type="email"
-            required
-            value={email}
-            placeholder="name@example.com"
-            autoComplete="email"
-            aria-invalid={!!fieldErrors.email}
-            onBlur={() =>
-              setFieldErrors((p) => ({
-                ...p,
-                email: email ? validateEmail(email) : "",
-              }))
-            }
-            onChange={(e) => {
-              setEmail(e.target.value);
-              clearFieldError("email");
-            }}
-          />
-          {fieldErrors.email && (
-            <p className="field-error">{fieldErrors.email}</p>
-          )}
-        </div>
-        <div className="field">
-          <label htmlFor="pw">
-            {mode === "signup" ? "비밀번호 (6자 이상, 영문+숫자)" : "비밀번호"}
-          </label>
-          <input
-            id="pw"
-            type="password"
-            required
-            minLength={6}
-            value={password}
-            autoComplete={
-              mode === "signup" ? "new-password" : "current-password"
-            }
-            aria-invalid={!!fieldErrors.password}
-            onBlur={() =>
-              mode === "signup" &&
-              setFieldErrors((p) => ({
-                ...p,
-                password: password ? validatePassword(password) : "",
-              }))
-            }
-            onChange={(e) => {
-              setPassword(e.target.value);
-              clearFieldError("password");
-            }}
-          />
-          {fieldErrors.password && (
-            <p className="field-error">{fieldErrors.password}</p>
-          )}
-        </div>
+        <Field
+          id="email"
+          label="이메일"
+          type="email"
+          required
+          value={email}
+          placeholder="name@example.com"
+          autoComplete="email"
+          error={fieldErrors.email}
+          onBlur={() =>
+            setFieldErrors((p) => ({
+              ...p,
+              email: email ? validateEmail(email) : "",
+            }))
+          }
+          onChange={(e) => {
+            setEmail(e.target.value);
+            clearFieldError("email");
+          }}
+        />
+        <Field
+          id="pw"
+          label={mode === "signup" ? "비밀번호 (6자 이상, 영문+숫자)" : "비밀번호"}
+          type="password"
+          required
+          minLength={6}
+          value={password}
+          autoComplete={mode === "signup" ? "new-password" : "current-password"}
+          error={fieldErrors.password}
+          onBlur={() =>
+            mode === "signup" &&
+            setFieldErrors((p) => ({
+              ...p,
+              password: password ? validatePassword(password) : "",
+            }))
+          }
+          onChange={(e) => {
+            setPassword(e.target.value);
+            clearFieldError("password");
+          }}
+        />
         {mode === "signin" && (
-          <button
+          <LinkButton
             type="button"
-            className="linklike"
-            style={{ marginTop: 10, textDecoration: "underline" }}
+            className="mt-2.5 underline"
             disabled={resetBusy}
             onClick={forgotPassword}
           >
             {resetBusy ? "메일 보내는 중…" : "비밀번호를 잊으셨나요?"}
-          </button>
+          </LinkButton>
         )}
         {mode === "signup" && (
-          <div className="consent">
-            <label className="consent-row">
+          <div className="mt-4 rounded-md border border-line bg-surface-2 px-3.5 py-3">
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
               <input
                 type="checkbox"
+                className="size-4 flex-none accent-brand"
                 checked={agreed}
                 onChange={(e) => {
                   setAgreed(e.target.checked);
@@ -801,41 +734,25 @@ function AccountCard({ session, nickname }) {
               />
               <span>개인정보 수집 및 이용에 동의합니다. (필수)</span>
             </label>
-            <button
+            <LinkButton
               type="button"
-              className="linklike"
-              style={{ textDecoration: "underline" }}
+              className="mt-1.5 underline"
               onClick={() => setShowPrivacy(true)}
             >
               자세히 보기
-            </button>
-            {fieldErrors.agreed && (
-              <p className="field-error">{fieldErrors.agreed}</p>
-            )}
+            </LinkButton>
+            {fieldErrors.agreed && <FieldError>{fieldErrors.agreed}</FieldError>}
           </div>
         )}
-        {error && (
-          <p className="sub" style={{ color: "var(--red)", marginTop: 10 }}>
-            {error}
-          </p>
-        )}
-        {notice && (
-          <p className="sub" style={{ marginTop: 10 }}>
-            {notice}
-          </p>
-        )}
-        <button
-          className="cta"
-          type="submit"
-          disabled={busy}
-          style={{ marginTop: 14 }}
-        >
+        {error && <Sub className="mt-2.5 text-brand">{error}</Sub>}
+        {notice && <Sub className="mt-2.5">{notice}</Sub>}
+        <Button type="submit" className="mt-3.5" disabled={busy}>
           {busy ? "처리 중…" : mode === "signup" ? "가입하기" : "로그인"}
-        </button>
+        </Button>
       </form>
-      <button
-        className="cta secondary"
-        style={{ marginTop: 10 }}
+      <Button
+        variant="secondary"
+        className="mt-2.5"
         onClick={() => {
           setMode(mode === "signup" ? "signin" : "signup");
           setError("");
@@ -845,9 +762,9 @@ function AccountCard({ session, nickname }) {
         }}
       >
         {mode === "signup" ? "이미 계정이 있나요? 로그인" : "회원가입"}
-      </button>
+      </Button>
       {showPrivacy && <PrivacyModal onClose={() => setShowPrivacy(false)} />}
-    </section>
+    </Card>
   );
 }
 
@@ -881,111 +798,80 @@ function DeleteAccountModal({ email, onClose }) {
   }
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div
-        className="modal"
-        role="dialog"
-        aria-modal="true"
-        aria-label="회원 탈퇴"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3>회원 탈퇴 😢</h3>
-        <p className="sub" style={{ marginTop: 8 }}>
-          탈퇴하면 계정과 운동 기록·인증샷·그룹 정보가 <strong>모두 영구 삭제</strong>
-          되며 되돌릴 수 없어요. 계속하려면 비밀번호를 입력해 주세요.
-        </p>
-        <div className="field" style={{ marginTop: 12 }}>
-          <label htmlFor="del-pw">비밀번호</label>
-          <input
-            id="del-pw"
-            type="password"
-            autoFocus
-            autoComplete="current-password"
-            value={pw}
-            onChange={(e) => {
-              setPw(e.target.value);
-              setErr("");
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") confirmDelete();
-            }}
-          />
-          {err && <p className="field-error">{err}</p>}
-        </div>
-        <button
-          className="cta"
-          style={{ marginTop: 14 }}
-          disabled={busy}
-          onClick={confirmDelete}
-        >
-          {busy ? "처리 중…" : "탈퇴하기"}
-        </button>
-        <button
-          className="cta secondary"
-          style={{ marginTop: 10 }}
-          disabled={busy}
-          onClick={onClose}
-        >
-          취소
-        </button>
-      </div>
-    </div>
+    <Modal label="회원 탈퇴" onBackdrop={onClose}>
+      <ModalTitle>회원 탈퇴 😢</ModalTitle>
+      <ModalText>
+        탈퇴하면 계정과 운동 기록·인증샷·그룹 정보가 <strong>모두 영구 삭제</strong>
+        되며 되돌릴 수 없어요. 계속하려면 비밀번호를 입력해 주세요.
+      </ModalText>
+      <Field
+        id="del-pw"
+        label="비밀번호"
+        className="mt-3"
+        type="password"
+        autoFocus
+        autoComplete="current-password"
+        value={pw}
+        error={err}
+        onChange={(e) => {
+          setPw(e.target.value);
+          setErr("");
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") confirmDelete();
+        }}
+      />
+      <Button className="mt-3.5" disabled={busy} onClick={confirmDelete}>
+        {busy ? "처리 중…" : "탈퇴하기"}
+      </Button>
+      <Button variant="secondary" className="mt-2.5" disabled={busy} onClick={onClose}>
+        취소
+      </Button>
+    </Modal>
   );
 }
 
 // ── 개인정보 처리 동의 전문 모달 ───────────────
 function PrivacyModal({ onClose }) {
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div
-        className="modal privacy-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-label="개인정보 처리 동의"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3>개인정보 처리 동의 (필수)</h3>
-        <div className="privacy-body">
-          <p>
-            본 서비스는 회원가입 및 운동 기록 관리 서비스를 제공하기 위해
-            아래와 같이 개인정보를 수집·이용합니다.
-          </p>
-          <strong>수집 항목</strong>
-          <ul>
-            <li>이메일</li>
-            <li>이름</li>
-            <li>전화번호</li>
-            <li>닉네임</li>
-            <li>비밀번호(암호화 저장)</li>
-            <li>프로필 사진 · 인증샷(선택 업로드)</li>
-            <li>운동 기록(사용자가 직접 입력한 정보)</li>
-          </ul>
-          <strong>이용 목적</strong>
-          <ul>
-            <li>회원 식별 및 로그인</li>
-            <li>운동 기록 저장 및 조회</li>
-            <li>서비스 운영 및 오류 대응</li>
-          </ul>
-          <strong>보관 기간</strong>
-          <ul>
-            <li>
-              회원 탈퇴 시까지 보관하며, 관련 법령에 따라 보관이 필요한 경우
-              해당 기간 동안 보관합니다.
-            </li>
-          </ul>
-          <p>
-            이용자는 개인정보 수집 및 이용에 대한 동의를 거부할 수 있으나,
-            동의하지 않을 경우 회원가입이 제한됩니다.
-          </p>
-        </div>
-        <button
-          className="cta secondary"
-          style={{ marginTop: 16 }}
-          onClick={onClose}
-        >
-          닫기
-        </button>
+    <Modal label="개인정보 처리 동의" onBackdrop={onClose} className="max-h-[80dvh] overflow-y-auto">
+      <ModalTitle>개인정보 처리 동의 (필수)</ModalTitle>
+      <div className="mt-3.5 text-sm text-dim [&_li]:mt-1 [&_strong]:mt-3.5 [&_strong]:block [&_strong]:text-fg [&_ul]:mt-1.5 [&_ul]:ml-4.5 [&_ul]:list-disc [&>p]:mt-2">
+        <p>
+          본 서비스는 회원가입 및 운동 기록 관리 서비스를 제공하기 위해
+          아래와 같이 개인정보를 수집·이용합니다.
+        </p>
+        <strong>수집 항목</strong>
+        <ul>
+          <li>이메일</li>
+          <li>이름</li>
+          <li>전화번호</li>
+          <li>닉네임</li>
+          <li>비밀번호(암호화 저장)</li>
+          <li>프로필 사진 · 인증샷(선택 업로드)</li>
+          <li>운동 기록(사용자가 직접 입력한 정보)</li>
+        </ul>
+        <strong>이용 목적</strong>
+        <ul>
+          <li>회원 식별 및 로그인</li>
+          <li>운동 기록 저장 및 조회</li>
+          <li>서비스 운영 및 오류 대응</li>
+        </ul>
+        <strong>보관 기간</strong>
+        <ul>
+          <li>
+            회원 탈퇴 시까지 보관하며, 관련 법령에 따라 보관이 필요한 경우
+            해당 기간 동안 보관합니다.
+          </li>
+        </ul>
+        <p>
+          이용자는 개인정보 수집 및 이용에 대한 동의를 거부할 수 있으나,
+          동의하지 않을 경우 회원가입이 제한됩니다.
+        </p>
       </div>
-    </div>
+      <Button variant="secondary" className="mt-4" onClick={onClose}>
+        닫기
+      </Button>
+    </Modal>
   );
 }

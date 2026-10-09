@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { enablePush } from "../push.js";
 import { toast } from "../toast.js";
+import { Button, Modal, ModalText, ModalTitle } from "./ui.jsx";
 
 // 가입 완료 후 1회: 푸시 알림 동의/미동의 모달
 // - 동의 → 브라우저 권한 요청 + 구독
@@ -31,42 +32,33 @@ export default function PushConsentModal({ onClose }) {
 
   if (step === "declined") {
     return (
-      <div className="modal-backdrop">
-        <div className="modal" role="dialog" aria-modal="true" aria-label="알림 안내">
-          <h3>알겠어요 👌</h3>
-          <p className="sub" style={{ marginTop: 8 }}>
-            운동 리마인더 알림은 <strong>설정 → 기타</strong>에서 언제든 켤 수 있어요.
-          </p>
-        </div>
-      </div>
+      <Modal label="알림 안내">
+        <ModalTitle>알겠어요 👌</ModalTitle>
+        <ModalText>
+          운동 리마인더 알림은 <strong>설정 → 기타</strong>에서 언제든 켤 수 있어요.
+        </ModalText>
+      </Modal>
     );
   }
 
   return (
-    <div className="modal-backdrop">
-      <div className="modal" role="dialog" aria-modal="true" aria-label="푸시 알림 동의">
-        <h3>운동 리마인더 알림 🔔</h3>
-        <p className="sub" style={{ marginTop: 8 }}>
-          운동을 안 한 날 저녁에 브라우저 알림으로 알려드릴까요? 꾸준한 streak에
-          도움이 돼요.
-        </p>
-        <button
-          className="cta"
-          style={{ marginTop: 18 }}
-          disabled={busy}
-          onClick={agree}
-        >
-          {busy ? "설정 중…" : "동의하고 알림 받기"}
-        </button>
-        <button
-          className="cta secondary"
-          style={{ marginTop: 10 }}
-          disabled={busy}
-          onClick={() => setStep("declined")}
-        >
-          미동의 (다음에 할게요)
-        </button>
-      </div>
-    </div>
+    <Modal label="푸시 알림 동의">
+      <ModalTitle>운동 리마인더 알림 🔔</ModalTitle>
+      <ModalText>
+        운동을 안 한 날 저녁에 브라우저 알림으로 알려드릴까요? 꾸준한 streak에
+        도움이 돼요.
+      </ModalText>
+      <Button className="mt-4.5" disabled={busy} onClick={agree}>
+        {busy ? "설정 중…" : "동의하고 알림 받기"}
+      </Button>
+      <Button
+        variant="secondary"
+        className="mt-2.5"
+        disabled={busy}
+        onClick={() => setStep("declined")}
+      >
+        미동의 (다음에 할게요)
+      </Button>
+    </Modal>
   );
 }
