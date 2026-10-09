@@ -190,3 +190,21 @@ export function MemberAvatar({ name, avatar, active, className }) {
     </span>
   )
 }
+
+// 그룹 사진 — 원형, 사진이 없으면 그룹 이름 첫 글자
+export function GroupPhoto({ name, url, className }) {
+  return (
+    <span
+      className={cx(
+        'flex size-12 flex-none items-center justify-center overflow-hidden rounded-full border border-line bg-surface-2 text-lg font-bold text-dim',
+        className,
+      )}
+    >
+      {url ? (
+        <img className="size-full object-cover" src={url} alt={`${name} 그룹 사진`} loading="lazy" />
+      ) : (
+        <span aria-hidden="true">{(name || '?').trim().charAt(0)}</span>
+      )}
+    </span>
+  )
+}

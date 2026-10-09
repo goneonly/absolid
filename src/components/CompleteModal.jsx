@@ -1,25 +1,6 @@
 import { useRef, useState } from 'react'
 import { Button, Modal, ModalText, ModalTitle } from './ui.jsx'
-
-// 사진을 긴 변 720px 이하 JPEG dataURL로 압축 (localStorage 용량 보호)
-function compressImage(file) {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file)
-    const img = new Image()
-    img.onload = () => {
-      const MAX = 720
-      const scale = Math.min(1, MAX / Math.max(img.width, img.height))
-      const canvas = document.createElement('canvas')
-      canvas.width = Math.round(img.width * scale)
-      canvas.height = Math.round(img.height * scale)
-      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
-      URL.revokeObjectURL(url)
-      resolve(canvas.toDataURL('image/jpeg', 0.8))
-    }
-    img.onerror = reject
-    img.src = url
-  })
-}
+import { compressImage } from '../image.js'
 
 export default function CompleteModal({ day, onSave, onSkip }) {
   const fileRef = useRef(null)

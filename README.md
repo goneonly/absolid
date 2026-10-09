@@ -11,6 +11,7 @@
 - [x] Day 7: 검증 + Vercel 배포 (https://absolid.vercel.app)
 - [x] Day 8: 미운동 리마인더 — 홈 배너(저녁 6시 이후) + 브라우저 푸시(매일 KST 20시, NOTIFICATIONS_SETUP.md)
 - [x] v0.4: 보안·버그 패치(권한상승 차단·관리자 조회 복구·인증샷 비공개 signed URL·원자적 그룹참여), 비밀번호 재설정, 회원 탈퇴, 주간 리포트, CI(GitHub Actions) — `supabase/security-and-fixes.sql` 실행 필요
+- [x] v0.5: 여러 그룹 참여(그룹 홈 목록), 그룹 사진, 그룹장 자동 위임, 점검 오류 수정 — `supabase/v0.5-groups-and-fixes.sql` 실행 + `delete-account` 재배포 필요
 
 ## 실행 방법 (개발자용)
 ```bash

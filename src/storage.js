@@ -29,6 +29,15 @@ export function clearRecords() {
   localStorage.removeItem(RECORDS_KEY)
 }
 
+// 로그아웃 시: 이 기기에 남은 계정별 데이터 정리
+// (남겨두면 다른 계정으로 로그인할 때 이전 계정 기록이 새 계정으로 업로드됨)
+const USER_SCOPED_KEYS = [RECORDS_KEY, PROFILE_KEY, 'absolid.cleanup.v1', 'absolid.remind.dismissed']
+export function clearLocalUserData() {
+  try {
+    for (const k of USER_SCOPED_KEYS) localStorage.removeItem(k)
+  } catch { /* noop */ }
+}
+
 // 오래된 인증샷(dataURL)만 로컬에서 정리 — 완료 기록 자체는 유지
 // localStorage 한도(약 5MB) 보호: 최근 keepDays일 사진만 남김
 export function cleanupLocalPhotos(keepDays = 7) {

@@ -1,6 +1,6 @@
 // 서버 기록 동기화 — 로그인 상태일 때만 동작, 아니면 조용히 패스
 import { supabase } from './supabase.js'
-import { getRecords } from './storage.js'
+import { getRecords, todayKey } from './storage.js'
 
 async function uid() {
   if (!supabase) return null
@@ -39,10 +39,12 @@ async function signPhotoPaths(paths) {
 export async function pushRecord(dateKey, day, completedAt) {
   const user_id = await uid()
   if (!user_id) return
-  await supabase.from('workouts').upsert(
+  // supabase-js 는 실패해도 throw 하지 않고 { error } 를 반환 → 직접 던져서 호출부가 안내하게 함
+  const { error } = await supabase.from('workouts').upsert(
     { user_id, date: dateKey, day, completed_at: completedAt || new Date().toISOString() },
     { onConflict: 'user_id,date' }
   )
+  if (error) throw new Error(error.message)
 }
 
 export async function fetchServerRecords() {
@@ -74,9 +76,10 @@ export async function uploadPhoto(dateKey, dataUrl) {
       .upload(path, blob, { upsert: true, contentType: 'image/jpeg' })
     if (error) return null
     // 비공개 버킷: DB에는 경로를 저장하고, 즉시 표시용 signed URL 을 반환
-    await supabase.from('workouts')
+    const { error: linkErr } = await supabase.from('workouts')
       .update({ photo_url: path })
       .eq('user_id', user_id).eq('date', dateKey)
+    if (linkErr) return null
     const { data } = await supabase.storage.from('photos').createSignedUrl(path, PHOTO_TTL)
     return data?.signedUrl || path
   } catch { return null }
@@ -90,7 +93,7 @@ export async function cleanupOldServerPhotos(keepDays = 30) {
   if (!user_id) return
   const cutoff = new Date()
   cutoff.setDate(cutoff.getDate() - keepDays)
-  const cutoffKey = cutoff.toISOString().slice(0, 10)
+  const cutoffKey = todayKey(cutoff)
   try {
     const { data: files } = await supabase.storage.from('photos').list(user_id, { limit: 1000 })
     const old = (files || [])
@@ -140,49 +143,37 @@ export async function pushProfile(nickname) {
   await supabase.from('profiles').upsert({ id: user_id, nickname: nickname || '' })
 }
 
-function makeInviteCode() {
-  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789' // 헷갈리는 문자(I,L,O,0,1) 제외
-  let out = ''
-  for (let i = 0; i < 6; i++) out += chars[Math.floor(Math.random() * chars.length)]
-  return out
-}
-
-// 내가 속한 그룹 조회 (없으면 null)
-export async function fetchMyGroup() {
+// 내가 속한 그룹 목록 (참여 순서 무관, 생성일 오래된 순) + 멤버 수
+export async function fetchMyGroups() {
   const user_id = await uid()
-  if (!user_id) return null
-  const { data: mem } = await supabase
-    .from('group_members').select('group_id').eq('user_id', user_id).limit(1)
-  if (!mem?.length) return null
-  const { data: g } = await supabase
-    .from('groups').select('id, name, invite_code, max_members').eq('id', mem[0].group_id).single()
-  return g || null
+  if (!user_id) return []
+  const { data: mem, error: memErr } = await supabase
+    .from('group_members').select('group_id').eq('user_id', user_id)
+  if (memErr) throw new Error('그룹 목록을 불러오지 못했어요.')
+  if (!mem?.length) return []
+  const { data, error } = await supabase
+    .from('groups')
+    .select('id, name, invite_code, max_members, members_only, created_by, photo_url, created_at, group_members(count)')
+    .in('id', mem.map(m => m.group_id))
+    .order('created_at')
+  if (error) throw new Error('그룹 목록을 불러오지 못했어요.')
+  return (data || []).map(g => ({ ...g, memberCount: g.group_members?.[0]?.count ?? 0 }))
 }
 
+// 그룹 생성 — 그룹·내 멤버십·초대 코드를 서버 함수에서 한 번에 처리 (v0.5-groups-and-fixes.sql)
 export async function createGroup(name, nickname, options = {}) {
   const user_id = await uid()
   if (!user_id) throw new Error('로그인이 필요해요.')
-  // 단일 그룹 정책: 이미 그룹에 속해 있으면 생성 불가
-  const { data: existing } = await supabase
-    .from('group_members').select('group_id').eq('user_id', user_id).limit(1)
-  if (existing?.length) throw new Error('이미 그룹에 참여 중이에요. 먼저 나간 뒤 새 그룹을 만들 수 있어요.')
-  const max_members = Math.min(50, Math.max(2, Number(options.maxMembers) || 10))
-  const members_only = !!options.membersOnly
   await pushProfile(nickname)
-  // 초대 코드 충돌 시 재시도 (최대 3회)
-  for (let i = 0; i < 3; i++) {
-    const invite_code = makeInviteCode()
-    const { data, error } = await supabase
-      .from('groups')
-      .insert({ name, invite_code, created_by: user_id, max_members, members_only })
-      .select('id, name, invite_code, max_members, members_only').single()
-    if (!error && data) {
-      await supabase.from('group_members').insert({ group_id: data.id, user_id })
-      return data
-    }
-    if (error && !String(error.message).includes('duplicate')) throw new Error('그룹 생성에 실패했어요. 잠시 후 다시 시도해 주세요.')
-  }
-  throw new Error('그룹 생성에 실패했어요. 다시 시도해 주세요.')
+  const { data, error } = await supabase.rpc('create_group', {
+    p_name: name,
+    p_max_members: Number(options.maxMembers),
+    p_members_only: !!options.membersOnly,
+  })
+  if (error) throw new Error(error.message || '그룹 생성에 실패했어요. 잠시 후 다시 시도해 주세요.')
+  const g = Array.isArray(data) ? data[0] : data
+  if (!g) throw new Error('그룹 생성에 실패했어요. 다시 시도해 주세요.')
+  return g
 }
 
 export async function joinGroup(code, nickname) {
@@ -200,10 +191,35 @@ export async function joinGroup(code, nickname) {
   return g
 }
 
-export async function leaveGroup(groupId) {
-  const user_id = await uid()
-  if (!user_id) return
-  await supabase.from('group_members').delete().eq('group_id', groupId).eq('user_id', user_id)
+// 그룹 나가기 — 그룹장이면 서버에서 자동 위임, 마지막 멤버면 그룹 삭제
+export async function leaveGroup(group) {
+  // 마지막 멤버(=그룹장)가 나가면 그룹이 사라지므로 그룹 사진을 먼저 정리 (그룹장만 삭제 가능)
+  if (group.memberCount <= 1 && group.photo_url) {
+    await supabase.storage.from('group-photos').remove([`${group.id}/photo.jpg`]).catch(() => {})
+  }
+  const { error } = await supabase.rpc('leave_group', { p_gid: group.id })
+  if (error) throw new Error('그룹 나가기에 실패했어요. 잠시 후 다시 시도해 주세요.')
+}
+
+// ── 그룹 사진 (그룹장 전용) ─────────────────
+export async function uploadGroupPhoto(groupId, dataUrl) {
+  const blob = await (await fetch(dataUrl)).blob()
+  const path = `${groupId}/photo.jpg`
+  const { error } = await supabase.storage
+    .from('group-photos')
+    .upload(path, blob, { upsert: true, contentType: 'image/jpeg' })
+  if (error) throw new Error('그룹 사진 업로드에 실패했어요.')
+  const { data } = supabase.storage.from('group-photos').getPublicUrl(path)
+  const url = `${data.publicUrl}?t=${Date.now()}`
+  const { error: setErr } = await supabase.rpc('set_group_photo', { p_gid: groupId, p_url: url })
+  if (setErr) throw new Error(setErr.message || '그룹 사진 저장에 실패했어요.')
+  return url
+}
+
+export async function removeGroupPhoto(groupId) {
+  const { error } = await supabase.rpc('set_group_photo', { p_gid: groupId, p_url: null })
+  if (error) throw new Error(error.message || '그룹 사진 삭제에 실패했어요.')
+  await supabase.storage.from('group-photos').remove([`${groupId}/photo.jpg`]).catch(() => {})
 }
 
 // 그룹 멤버 + 최근 7일 운동현황 + 오늘의 인증샷
@@ -212,9 +228,10 @@ export async function fetchGroupStatus(groupId) {
     .from('group_members').select('user_id').eq('group_id', groupId)
   const ids = (mem || []).map(m => m.user_id)
   if (!ids.length) return { members: [], photos: [] }
+  // 기록 날짜는 기기 로컬(한국) 날짜로 저장되므로 같은 기준으로 계산 (toISOString 은 UTC라 0~9시에 하루 밀림)
   const since = new Date(); since.setDate(since.getDate() - 6)
-  const sinceKey = since.toISOString().slice(0, 10)
-  const todayStr = new Date().toISOString().slice(0, 10)
+  const sinceKey = todayKey(since)
+  const todayStr = todayKey()
   const [{ data: profs }, { data: works }] = await Promise.all([
     supabase.rpc('get_group_profiles', { gid: groupId }),
     supabase.from('workouts').select('user_id, date, photo_url').in('user_id', ids).gte('date', sinceKey),

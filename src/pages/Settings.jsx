@@ -18,6 +18,7 @@ import {
 import { uploadAvatar, deleteAvatar, resetServerWorkouts } from "../api.js";
 import { isPushSupported, getPushEnabled, enablePush, disablePush } from "../push.js";
 import { toast } from "../toast.js";
+import { compressImage } from "../image.js";
 import {
   Button,
   Card,
@@ -42,25 +43,6 @@ import {
   validatePassword,
   validateNickname,
 } from "../validation.js";
-
-// 프로필 사진을 512px 이하 JPEG dataURL로 압축
-function compressImage(file, max = 512) {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      const scale = Math.min(1, max / Math.max(img.width, img.height));
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
-      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL("image/jpeg", 0.85));
-    };
-    img.onerror = reject;
-    img.src = url;
-  });
-}
 
 export default function Settings({ session, onChanged, isAdmin, onOpenAdmin }) {
   const [nickname, setNickname] = useState(getProfile().nickname);
@@ -94,8 +76,11 @@ export default function Settings({ session, onChanged, isAdmin, onOpenAdmin }) {
       new Blob([csv], { type: "text/csv;charset=utf-8" }),
     );
     a.download = `absolid-records-${todayKey()}.csv`;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(a.href);
+    a.remove();
+    // 바로 해제하면 iOS Safari 에서 다운로드가 취소될 수 있어 잠시 뒤 해제
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
   }
 
   // ── 운동 기록 초기화: 회원은 비밀번호 확인 후 → 기존 확인 알림 순서 ──
@@ -339,7 +324,7 @@ function ProfilePhoto({ nickname, session, onChanged }) {
     }
     setBusy(true);
     try {
-      const dataUrl = await compressImage(file);
+      const dataUrl = await compressImage(file, { max: 512, quality: 0.85 });
       saveProfile({ ...getProfile(), avatar: dataUrl });
       setAvatar(dataUrl);
       if (session) {

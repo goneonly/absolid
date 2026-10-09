@@ -32,6 +32,7 @@ export default function App() {
   const refresh = useCallback(() => setTick(t => t + 1), [])
   const session = useAuth()
   const records = getRecords()
+  const accountKey = session?.user?.id || 'guest'
 
   // 앱 시작 시: 7일 지난 로컬 인증샷 정리 (localStorage 용량 보호)
   useEffect(() => { cleanupLocalPhotos(7) }, [])
@@ -103,8 +104,9 @@ export default function App() {
 
       {view === 'home' && <Home records={records} onStart={() => setView('workout')} />}
       {view === 'workout' && <Workout session={session} onDone={() => { refresh(); setView('home') }} />}
-      {view === 'group' && <Group records={records} session={session} />}
-      {view === 'settings' && <Settings session={session} onChanged={refresh} isAdmin={isAdmin} onOpenAdmin={() => setView('admin')} />}
+      {/* 계정이 바뀌면 화면 상태(닉네임 입력값·선택한 그룹 등)를 새로 시작 */}
+      {view === 'group' && <Group key={accountKey} records={records} session={session} />}
+      {view === 'settings' && <Settings key={accountKey} session={session} onChanged={refresh} isAdmin={isAdmin} onOpenAdmin={() => setView('admin')} />}
       {view === 'admin' && (isAdmin
         ? <Admin onBack={() => setView('settings')} />
         : <Page><PageTitle>관리자</PageTitle><Sub>접근 권한이 없어요.</Sub></Page>)}

@@ -5,7 +5,7 @@
 --   1) 권한 상승 차단  — 일반 사용자가 자기 role/is_active 를 바꾸지 못하게 막음 + 지정 이메일 자동 관리자
 --   2) 관리자 profiles 조회 정책 — 관리자 회원 관리·신고자 이름 조회 복구
 --   3) 인증샷 비공개 버킷 전환 — signed URL 로만 열람 (프론트 배포 후 실행 권장, 아래 주의 참고)
---   4) 그룹 참여 원자적 처리 — 정원 초과 경합 방지 + 단일 그룹 정책
+--   4) 그룹 참여 원자적 처리 — 정원 초과 경합 방지
 --   5) 회원 탈퇴용 본인 프로필 삭제 정책
 --   6) 정책 멱등성 정리 (재실행 안전)
 
@@ -30,8 +30,8 @@ begin
     new.role := case when is_special then 'admin' else 'user' end;
     new.is_active := true;
   else -- UPDATE
-    if public.is_admin() then
-      null;                       -- 관리자는 자유롭게 변경 (회원 비활성 처리 등)
+    if auth.uid() is null or public.is_admin() then
+      null;                       -- 운영자(SQL Editor)·관리자는 자유롭게 변경 (회원 비활성 처리 등)
     elsif is_special then
       new.role := 'admin';        -- 지정 이메일은 admin 유지
       new.is_active := old.is_active;
@@ -72,7 +72,7 @@ update storage.buckets set public = false where id = 'photos';
 -- 프로필 사진(avatars)은 민감도가 낮아 공개 유지 (변경하지 않음)
 
 -- ══════════════════════════════════════════════
--- 4) 그룹 참여 원자적 처리 (정원 경합 방지 + 단일 그룹)
+-- 4) 그룹 참여 원자적 처리 (정원 경합 방지) — v0.5 부터 여러 그룹 참여 허용
 -- ══════════════════════════════════════════════
 create or replace function public.join_group(code text)
 returns table(id uuid, name text, invite_code text, max_members int, members_only boolean)
@@ -89,16 +89,12 @@ begin
   if uid is null then raise exception '로그인이 필요해요.'; end if;
 
   -- 그룹 행을 잠근 채 조회 → 동시 참여 경합 방지
-  select * into g from public.groups gr where gr.invite_code = code for update;
+  select * into g from public.groups gr where gr.invite_code = upper(btrim(code)) for update;
   if g.id is null then raise exception '초대 코드를 찾을 수 없어요. 다시 확인해 주세요.'; end if;
 
   -- 이미 이 그룹 멤버면 그대로 반환 (재참여 무해)
   if exists (select 1 from public.group_members gm where gm.user_id = uid and gm.group_id = g.id) then
     return query select g.id, g.name, g.invite_code, g.max_members, g.members_only; return;
-  end if;
-  -- 다른 그룹에 이미 소속돼 있으면 차단 (단일 그룹 정책)
-  if exists (select 1 from public.group_members gm where gm.user_id = uid) then
-    raise exception '이미 다른 그룹에 참여 중이에요. 먼저 나간 뒤 참여해 주세요.';
   end if;
 
   -- 정원 확인
@@ -138,9 +134,9 @@ create policy "photos: 본인 폴더 업로드" on storage.objects
 drop policy if exists "photos: 본인 폴더 덮어쓰기" on storage.objects;
 create policy "photos: 본인 폴더 덮어쓰기" on storage.objects
   for update using (bucket_id = 'photos' and auth.uid()::text = (storage.foldername(name))[1]);
+-- 조회 정책은 v0.5-groups-and-fixes.sql 의 "photos: 본인·그룹·관리자 조회" 로 대체
 drop policy if exists "photos: 누구나 조회" on storage.objects;
-create policy "photos: 인증된 사용자 조회" on storage.objects
-  for select using (bucket_id = 'photos' and auth.role() = 'authenticated');
+drop policy if exists "photos: 인증된 사용자 조회" on storage.objects;
 drop policy if exists "photos: 본인 폴더 삭제" on storage.objects;
 create policy "photos: 본인 폴더 삭제" on storage.objects
   for delete using (bucket_id = 'photos' and auth.uid()::text = (storage.foldername(name))[1]);

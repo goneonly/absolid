@@ -1,5 +1,6 @@
 // 인증 헬퍼 — supabase 미연결 시 모두 no-op
 import { supabase } from './supabase.js'
+import { clearLocalUserData } from './storage.js'
 
 const ERROR_KO = {
   'Invalid login credentials': '이메일 또는 비밀번호가 올바르지 않아요.',
@@ -24,7 +25,8 @@ export async function signUp(email, password, nickname, fullName, phone) {
     await supabase.from('profiles').upsert({ id: data.user.id, ...profile })
   } else {
     // 이메일 인증 대기 중엔 세션이 없어 RLS가 저장을 막음 → 첫 로그인 때 반영
-    localStorage.setItem(PENDING_PROFILE_KEY, JSON.stringify(profile))
+    // (다른 계정이 먼저 로그인해도 엉뚱한 계정에 저장되지 않도록 이메일을 함께 저장)
+    localStorage.setItem(PENDING_PROFILE_KEY, JSON.stringify({ email: email.toLowerCase(), profile }))
   }
   return { data }
 }
@@ -37,9 +39,13 @@ export async function flushPendingProfile() {
   const user = data.session?.user
   if (!user) return
   try {
-    await supabase.from('profiles').upsert({ id: user.id, ...JSON.parse(raw) })
-    localStorage.removeItem(PENDING_PROFILE_KEY)
-  } catch { /* 다음 로그인 때 재시도 */ }
+    const { email, profile } = JSON.parse(raw)
+    if (!profile || email !== (user.email || '').toLowerCase()) return // 가입한 계정으로 로그인할 때만
+    const { error } = await supabase.from('profiles').upsert({ id: user.id, ...profile })
+    if (!error) localStorage.removeItem(PENDING_PROFILE_KEY)
+  } catch {
+    localStorage.removeItem(PENDING_PROFILE_KEY) // 예전 형식이거나 손상된 값
+  }
 }
 
 export async function signIn(email, password) {
@@ -49,6 +55,7 @@ export async function signIn(email, password) {
 }
 
 export async function signOut() {
+  clearLocalUserData() // 세션 변경으로 화면이 다시 그려지기 전에 먼저 정리
   await supabase.auth.signOut()
 }
 
