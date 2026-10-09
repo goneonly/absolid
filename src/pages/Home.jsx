@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { computeStreak, todayKey, todayWorkoutDay } from '../storage.js'
 import { fetchActiveAnnouncement } from '../admin.js'
 import WeeklyReport from '../components/WeeklyReport.jsx'
-import { Banner, Button, Card, Page, PageTitle, Sub, cx } from '../components/ui.jsx'
+import { Banner, Card, Page, PageTitle, Sub, cx } from '../components/ui.jsx'
 
 const REMIND_DISMISS_KEY = 'absolid.remind.dismissed'
 const REMIND_AFTER_HOUR = 18 // 저녁 6시 이후부터 리마인더 표시
@@ -58,10 +58,6 @@ export default function Home({ records, onStart }) {
       </Card>
 
       <WeeklyReport records={records} />
-
-      <Button className="mt-5" onClick={onStart}>
-        {doneToday ? '오늘 운동 다시 보기' : `Day ${day} 운동 시작하기`}
-      </Button>
     </Page>
   )
 }
