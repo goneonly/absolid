@@ -51,6 +51,7 @@ returns date language plpgsql security definer set search_path = public as $$
 declare
   uid uuid := auth.uid();
   s public.workout_sessions;
+  v_left int; -- 기록되기까지 남은 시청 시간(초)
 begin
   if uid is null then raise exception '로그인이 필요해요.'; end if;
 
@@ -61,8 +62,12 @@ begin
     raise exception '시청 기록을 찾을 수 없어요. 영상을 처음부터 다시 재생해 주세요.';
   end if;
   if s.completed_at is null then
-    if now() - s.started_at < make_interval(secs => s.video_seconds * 0.8) then
-      raise exception '영상을 끝까지 시청해야 완료로 기록돼요.';
+    v_left := ceil(s.video_seconds * 0.8 - extract(epoch from now() - s.started_at));
+    if v_left > 0 then
+      -- 남은 시간 안내: 1분 이상이면 '약 N분'(올림), 미만이면 'N초'
+      raise exception '영상을 끝까지 시청해야 완료로 기록돼요. %',
+        case when v_left >= 60 then '약 ' || ceil(v_left / 60.0)::int || '분 남았어요.'
+             else v_left || '초 남았어요.' end;
     end if;
     if now() - s.started_at > interval '1 day' then
       raise exception '시청한 지 너무 오래돼 기록할 수 없어요.';
