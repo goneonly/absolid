@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { computeStreak, todayKey, todayWorkoutDay } from '../storage.js'
+import {
+  computeStreak, todayKey, todayWorkoutDay, isReminderDismissedToday, dismissReminderToday,
+} from '../storage.js'
 import { fetchActiveAnnouncement } from '../admin.js'
 import WeeklyReport from '../components/WeeklyReport.jsx'
 import { Banner, Card, Page, PageTitle, Sub, cx } from '../components/ui.jsx'
 
-const REMIND_DISMISS_KEY = 'absolid.remind.dismissed'
 const REMIND_AFTER_HOUR = 18 // 저녁 6시 이후부터 리마인더 표시
 
 export default function Home({ records, onStart }) {
@@ -12,9 +13,7 @@ export default function Home({ records, onStart }) {
   const doneToday = !!records[todayKey()]?.completed
   const day = todayWorkoutDay()
   const [notice, setNotice] = useState(null)
-  const [remindDismissed, setRemindDismissed] = useState(
-    localStorage.getItem(REMIND_DISMISS_KEY) === todayKey()
-  )
+  const [remindDismissed, setRemindDismissed] = useState(isReminderDismissedToday)
 
   useEffect(() => {
     fetchActiveAnnouncement().then(setNotice)
@@ -25,7 +24,7 @@ export default function Home({ records, onStart }) {
     !doneToday && !remindDismissed && new Date().getHours() >= REMIND_AFTER_HOUR
 
   function dismissReminder() {
-    localStorage.setItem(REMIND_DISMISS_KEY, todayKey())
+    dismissReminderToday()
     setRemindDismissed(true)
   }
 

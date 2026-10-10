@@ -1,6 +1,9 @@
 // 인증 헬퍼 — supabase 미연결 시 모두 no-op
 import { supabase } from './supabase.js'
-import { clearLocalUserData } from './storage.js'
+import {
+  clearLocalUserData, clearAllAppData,
+  loadPendingProfile, savePendingProfile, clearPendingProfile,
+} from './storage.js'
 
 const ERROR_KO = {
   'Invalid login credentials': '이메일 또는 비밀번호가 올바르지 않아요.',
@@ -10,8 +13,6 @@ const ERROR_KO = {
   'Unable to validate email address: invalid format': '이메일 형식이 올바르지 않아요.',
 }
 function ko(msg) { return ERROR_KO[msg] || `오류: ${msg}` }
-
-const PENDING_PROFILE_KEY = 'absolid.pendingProfile.v1'
 
 export async function signUp(email, password, nickname, fullName, phone) {
   const { data, error } = await supabase.auth.signUp({ email, password })
@@ -26,26 +27,22 @@ export async function signUp(email, password, nickname, fullName, phone) {
   } else {
     // 이메일 인증 대기 중엔 세션이 없어 RLS가 저장을 막음 → 첫 로그인 때 반영
     // (다른 계정이 먼저 로그인해도 엉뚱한 계정에 저장되지 않도록 이메일을 함께 저장)
-    localStorage.setItem(PENDING_PROFILE_KEY, JSON.stringify({ email: email.toLowerCase(), profile }))
+    savePendingProfile({ email: email.toLowerCase(), profile })
   }
   return { data }
 }
 
 // 가입 시 저장하지 못한 프로필을 로그인 후 서버에 반영
 export async function flushPendingProfile() {
-  const raw = localStorage.getItem(PENDING_PROFILE_KEY)
-  if (!raw || !supabase) return
+  const pending = loadPendingProfile()
+  if (!pending || !supabase) return
+  if (!pending.profile) return clearPendingProfile() // 예전 형식이거나 손상된 값
   const { data } = await supabase.auth.getSession()
   const user = data.session?.user
   if (!user) return
-  try {
-    const { email, profile } = JSON.parse(raw)
-    if (!profile || email !== (user.email || '').toLowerCase()) return // 가입한 계정으로 로그인할 때만
-    const { error } = await supabase.from('profiles').upsert({ id: user.id, ...profile })
-    if (!error) localStorage.removeItem(PENDING_PROFILE_KEY)
-  } catch {
-    localStorage.removeItem(PENDING_PROFILE_KEY) // 예전 형식이거나 손상된 값
-  }
+  if (pending.email !== (user.email || '').toLowerCase()) return // 가입한 계정으로 로그인할 때만
+  const { error } = await supabase.from('profiles').upsert({ id: user.id, ...pending.profile })
+  if (!error) clearPendingProfile()
 }
 
 export async function signIn(email, password) {
@@ -84,12 +81,7 @@ export async function deleteAccount() {
   if (error) {
     return { error: '탈퇴 처리에 실패했어요. 잠시 후 다시 시도하거나 관리자에게 문의해 주세요.' }
   }
-  // 로컬 흔적 정리 후 로그아웃
-  try {
-    for (const k of Object.keys(localStorage)) {
-      if (k.startsWith('absolid.')) localStorage.removeItem(k)
-    }
-  } catch { /* noop */ }
+  clearAllAppData() // 로컬 흔적 정리 후 로그아웃
   await supabase.auth.signOut()
   return { data: true }
 }

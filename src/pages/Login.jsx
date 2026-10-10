@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { signIn, signUp, sendPasswordReset } from '../auth.js'
-import { getProfile } from '../storage.js'
+import { getProfile, markOnboardingPending, cancelOnboarding } from '../storage.js'
 import {
   validateEmail, validateName, validatePhone, formatPhone, validatePassword,
 } from '../validation.js'
@@ -66,11 +66,11 @@ export default function Login({ onDone, onGuest }) {
     }
     // 온보딩 플래그는 가입 요청 "전"에 저장해야 함 —
     // 가입 성공 시 세션 발급(App의 팝업 체크)이 응답보다 먼저 일어나기 때문
-    localStorage.setItem('absolid.onboarding.v1', 'pending')
+    markOnboardingPending()
     const res = await signUp(email.trim(), password, getProfile().nickname, fullName.trim(), formatPhone(phone))
     setBusy(false)
     if (res?.error) {
-      localStorage.removeItem('absolid.onboarding.v1') // 가입 실패 시 롤백
+      cancelOnboarding() // 가입 실패 시 롤백
       setError(res.error)
       return
     }

@@ -8,7 +8,7 @@ import {
 } from "../storage.js";
 import { supabase } from "../supabase.js";
 import { signIn, signOut, saveNickname, deleteAccount } from "../auth.js";
-import { uploadAvatar, deleteAvatar, resetServerWorkouts } from "../api.js";
+import { uploadAvatar, deleteAvatar, fetchMyAvatarUrl, resetServerWorkouts } from "../api.js";
 import { isPushSupported, getPushEnabled, enablePush, disablePush } from "../push.js";
 import { toast } from "../toast.js";
 import { compressImage } from "../image.js";
@@ -288,16 +288,11 @@ function ProfilePhoto({ nickname, session, onChanged }) {
 
   // 새 기기에서 로그인한 경우: 서버에 저장된 프로필 사진 불러오기
   useEffect(() => {
-    if (!session || !supabase || getProfile().avatar) return;
+    if (!session || getProfile().avatar) return;
     let alive = true;
-    supabase
-      .from("profiles")
-      .select("avatar_url")
-      .eq("id", session.user.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (alive && data?.avatar_url) setAvatar(data.avatar_url);
-      });
+    fetchMyAvatarUrl().then((url) => {
+      if (alive && url) setAvatar(url);
+    });
     return () => {
       alive = false;
     };

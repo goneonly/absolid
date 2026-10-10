@@ -1,7 +1,7 @@
 // 관리자 모드 API — 모든 쓰기 권한은 서버 RLS(is_admin)로 검증됨
 import { supabase } from "./supabase.js";
 import { PLAYLIST_ID } from "./youtube.js";
-import { photoObjectPath } from "./api.js";
+import { BUCKET, workoutPhotoPath, photoObjectPath } from "./storagePaths.js";
 
 // ── 역할 조회 (일반 사용자도 사용) ─────────────
 export async function fetchMyRole() {
@@ -111,7 +111,7 @@ export async function fetchReports() {
   ];
   const signed = {};
   if (paths.length) {
-    const { data } = await supabase.storage.from("photos").createSignedUrls(paths, 3600);
+    const { data } = await supabase.storage.from(BUCKET.photos).createSignedUrls(paths, 3600);
     for (const it of data || []) if (it?.path && it?.signedUrl) signed[it.path] = it.signedUrl;
   }
   const photoOf = {};
@@ -129,8 +129,8 @@ export async function fetchReports() {
 export async function resolveReport(report, action) {
   if (action === "remove") {
     await supabase.storage
-      .from("photos")
-      .remove([`${report.target_user_id}/${report.target_date}.jpg`]);
+      .from(BUCKET.photos)
+      .remove([workoutPhotoPath(report.target_user_id, report.target_date)]);
     await supabase
       .from("workouts")
       .update({ photo_url: null })

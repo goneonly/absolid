@@ -43,6 +43,7 @@ Deno.serve(async (req) => {
     const { data: deletedGroups, error: hErr } = await admin.rpc('handoff_user_groups', { p_uid: uid })
     if (hErr) throw hErr
     // setof uuid 응답은 문자열 배열 (객체 형태로 와도 처리)
+    // 경로 규칙은 src/storagePaths.js 의 groupPhotoPath 와 같음: {groupId}/photo.jpg
     const emptied = ((deletedGroups || []) as Array<string | Record<string, string>>)
       .map((r) => (typeof r === 'string' ? r : r.handoff_user_groups))
       .filter(Boolean)

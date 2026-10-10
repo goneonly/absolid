@@ -12,16 +12,16 @@ import PushConsentModal from './components/PushConsentModal.jsx'
 import RecoveryModal from './components/RecoveryModal.jsx'
 import { supabase } from './supabase.js'
 import { isPushSupported } from './push.js'
-import { getRecords, mergeRecords, cleanupLocalPhotos, todayKey } from './storage.js'
+import {
+  getRecords, mergeRecords, cleanupLocalPhotos,
+  isGuestChosen, setGuestChosen, isOnboardingPending, markOnboardingDone,
+  isPushConsentAsked, markPushConsentAsked, isServerCleanupDoneToday, markServerCleanupDone,
+} from './storage.js'
 import { useAuth } from './useAuth.js'
 import { flushPendingProfile, signOut } from './auth.js'
 import { fetchServerRecords, syncLocalToServer, cleanupOldServerPhotos } from './api.js'
 import { fetchMyRole } from './admin.js'
 
-const CLEANUP_KEY = 'absolid.cleanup.v1'
-const ONBOARD_KEY = 'absolid.onboarding.v1'
-const PUSH_CONSENT_KEY = 'absolid.pushconsent.v1'
-const GUEST_KEY = 'absolid.guest.v1' // 첫 화면에서 '비회원으로 시작하기'를 고른 기기
 
 export default function App() {
   // view: home | workout | group | settings | admin
@@ -31,7 +31,7 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showPushConsent, setShowPushConsent] = useState(false)
   const [showRecovery, setShowRecovery] = useState(false)
-  const [guest, setGuest] = useState(() => localStorage.getItem(GUEST_KEY) === '1')
+  const [guest, setGuest] = useState(isGuestChosen)
   const refresh = useCallback(() => setTick(t => t + 1), [])
   const session = useAuth()
   const records = getRecords()
@@ -47,7 +47,7 @@ export default function App() {
       if (event === 'PASSWORD_RECOVERY') { setView('settings'); setShowRecovery(true) }
       // 로그아웃·탈퇴하면 다시 첫 로그인 화면부터
       if (event === 'SIGNED_OUT') {
-        localStorage.removeItem(GUEST_KEY)
+        setGuestChosen(false)
         setGuest(false)
         setView('home')
       }
@@ -55,9 +55,9 @@ export default function App() {
     return () => sub.subscription.unsubscribe()
   }, [])
 
-  // 가입 완료 후 첫 진입: 홈으로 이동 + 기능 소개 팝업 1회
+  // 기능 소개 팝업: 가입 완료 후 첫 진입 1회 (비회원은 '비회원으로 시작하기'를 누를 때마다 — Login onGuest)
   useEffect(() => {
-    if (session && localStorage.getItem(ONBOARD_KEY) === 'pending') {
+    if (session && isOnboardingPending()) {
       setView('home')
       setShowOnboarding(true)
     }
@@ -89,9 +89,9 @@ export default function App() {
       .then(fetchServerRecords)
       .then(server => { if (alive && server) { mergeRecords(server); refresh() } })
       .catch(() => {})
-    if (localStorage.getItem(CLEANUP_KEY) !== todayKey()) {
+    if (!isServerCleanupDoneToday()) {
       cleanupOldServerPhotos(30)
-        .then(() => localStorage.setItem(CLEANUP_KEY, todayKey()))
+        .then(markServerCleanupDone)
         .catch(() => {})
     }
     return () => { alive = false }
@@ -104,9 +104,10 @@ export default function App() {
       <Login
         onDone={() => setView('home')}
         onGuest={() => {
-          localStorage.setItem(GUEST_KEY, '1')
+          setGuestChosen(true)
           setGuest(true)
           setView('home')
+          setShowOnboarding(true) // 비회원으로 시작할 때마다 사용법 소개
         }}
       />
     )
@@ -134,7 +135,7 @@ export default function App() {
           onOpenAdmin={() => setView('admin')}
           onRequestLogin={() => {
             // 비회원 선택을 해제하면 첫 로그인 화면이 다시 표시됨
-            localStorage.removeItem(GUEST_KEY)
+            setGuestChosen(false)
             setGuest(false)
           }}
         />
@@ -146,10 +147,10 @@ export default function App() {
       {showOnboarding && (
         <OnboardingModal
           onClose={() => {
-            localStorage.setItem(ONBOARD_KEY, 'done')
+            markOnboardingDone()
             setShowOnboarding(false)
-            // 온보딩 종료 후: 푸시 알림 동의 팝업을 1회 표시 (지원 브라우저만)
-            if (isPushSupported() && !localStorage.getItem(PUSH_CONSENT_KEY)) {
+            // 온보딩 종료 후: 푸시 알림 동의 팝업을 1회 표시 (지원 브라우저 + 회원만 — 푸시는 로그인 필요)
+            if (session && isPushSupported() && !isPushConsentAsked()) {
               setShowPushConsent(true)
             }
           }}
@@ -159,7 +160,7 @@ export default function App() {
       {showPushConsent && (
         <PushConsentModal
           onClose={() => {
-            localStorage.setItem(PUSH_CONSENT_KEY, 'done')
+            markPushConsentAsked()
             setShowPushConsent(false)
           }}
         />

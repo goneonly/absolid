@@ -1,6 +1,9 @@
 // 서버 기록 동기화 — 로그인 상태일 때만 동작, 아니면 조용히 패스
 import { supabase } from './supabase.js'
 import { getRecords, todayKey } from './storage.js'
+import {
+  BUCKET, workoutPhotoPath, workoutPhotoDate, avatarPath, groupPhotoPath, inFolder, photoObjectPath,
+} from './storagePaths.js'
 
 async function uid() {
   if (!supabase) return null
@@ -10,22 +13,15 @@ async function uid() {
 
 // ── 인증샷 signed URL 헬퍼 ───────────────────
 // photos 버킷은 비공개라 조회 시 짧은 유효기간의 signed URL 을 발급받아야 함.
-// DB에는 스토리지 경로(`uid/date.jpg`)를 저장하되, 과거 public URL 로 저장된 값도 경로를 추출해 호환.
+// DB에는 스토리지 경로를 저장 (경로 규칙은 storagePaths.js)
 const PHOTO_TTL = 60 * 60 * 8 // 8시간
-
-export function photoObjectPath(value) {
-  if (!value) return null
-  const marker = '/photos/'
-  const i = value.indexOf(marker)
-  return i >= 0 ? value.slice(i + marker.length) : value // 이미 경로면 그대로
-}
 
 // 여러 경로를 한 번에 서명 → { path: signedUrl } 매핑 반환
 async function signPhotoPaths(paths) {
   const clean = [...new Set(paths.filter(Boolean).map(photoObjectPath))]
   if (!clean.length) return {}
   try {
-    const { data } = await supabase.storage.from('photos').createSignedUrls(clean, PHOTO_TTL)
+    const { data } = await supabase.storage.from(BUCKET.photos).createSignedUrls(clean, PHOTO_TTL)
     const out = {}
     for (const item of data || []) {
       if (item?.path && item?.signedUrl) out[item.path] = item.signedUrl
@@ -70,9 +66,9 @@ export async function uploadPhoto(dateKey, dataUrl) {
   if (!user_id || !dataUrl) return null
   try {
     const blob = await (await fetch(dataUrl)).blob()
-    const path = `${user_id}/${dateKey}.jpg`
+    const path = workoutPhotoPath(user_id, dateKey)
     const { error } = await supabase.storage
-      .from('photos')
+      .from(BUCKET.photos)
       .upload(path, blob, { upsert: true, contentType: 'image/jpeg' })
     if (error) return null
     // 비공개 버킷: DB에는 경로를 저장하고, 즉시 표시용 signed URL 을 반환
@@ -80,7 +76,7 @@ export async function uploadPhoto(dateKey, dataUrl) {
       .update({ photo_url: path })
       .eq('user_id', user_id).eq('date', dateKey)
     if (linkErr) return null
-    const { data } = await supabase.storage.from('photos').createSignedUrl(path, PHOTO_TTL)
+    const { data } = await supabase.storage.from(BUCKET.photos).createSignedUrl(path, PHOTO_TTL)
     return data?.signedUrl || path
   } catch { return null }
 }
@@ -95,11 +91,11 @@ export async function cleanupOldServerPhotos(keepDays = 30) {
   cutoff.setDate(cutoff.getDate() - keepDays)
   const cutoffKey = todayKey(cutoff)
   try {
-    const { data: files } = await supabase.storage.from('photos').list(user_id, { limit: 1000 })
+    const { data: files } = await supabase.storage.from(BUCKET.photos).list(user_id, { limit: 1000 })
     const old = (files || [])
-      .filter(f => f.name.replace('.jpg', '') < cutoffKey)
-      .map(f => `${user_id}/${f.name}`)
-    if (old.length) await supabase.storage.from('photos').remove(old)
+      .filter(f => workoutPhotoDate(f.name) < cutoffKey)
+      .map(f => inFolder(user_id, f.name))
+    if (old.length) await supabase.storage.from(BUCKET.photos).remove(old)
     await supabase.from('workouts')
       .update({ photo_url: null })
       .eq('user_id', user_id).lt('date', cutoffKey).not('photo_url', 'is', null)
@@ -113,23 +109,33 @@ export async function uploadAvatar(dataUrl) {
   if (!user_id || !dataUrl) return null
   try {
     const blob = await (await fetch(dataUrl)).blob()
-    const path = `${user_id}/avatar.jpg`
+    const path = avatarPath(user_id)
     const { error } = await supabase.storage
-      .from('avatars')
+      .from(BUCKET.avatars)
       .upload(path, blob, { upsert: true, contentType: 'image/jpeg' })
     if (error) return null
-    const { data } = supabase.storage.from('avatars').getPublicUrl(path)
+    const { data } = supabase.storage.from(BUCKET.avatars).getPublicUrl(path)
     const avatar_url = data?.publicUrl ? `${data.publicUrl}?t=${Date.now()}` : null
     if (avatar_url) await supabase.from('profiles').upsert({ id: user_id, avatar_url })
     return avatar_url
   } catch { return null }
 }
 
+// 서버에 저장된 내 프로필 사진 주소 (새 기기에서 로그인했을 때 불러오기용)
+export async function fetchMyAvatarUrl() {
+  const user_id = await uid()
+  if (!user_id) return null
+  const { data, error } = await supabase
+    .from('profiles').select('avatar_url').eq('id', user_id).maybeSingle()
+  if (error) return null
+  return data?.avatar_url || null
+}
+
 export async function deleteAvatar() {
   const user_id = await uid()
   if (!user_id) return
   try {
-    await supabase.storage.from('avatars').remove([`${user_id}/avatar.jpg`])
+    await supabase.storage.from(BUCKET.avatars).remove([avatarPath(user_id)])
     await supabase.from('profiles').upsert({ id: user_id, avatar_url: null })
   } catch { /* noop */ }
 }
@@ -195,7 +201,7 @@ export async function joinGroup(code, nickname) {
 export async function leaveGroup(group) {
   // 마지막 멤버(=그룹장)가 나가면 그룹이 사라지므로 그룹 사진을 먼저 정리 (그룹장만 삭제 가능)
   if (group.memberCount <= 1 && group.photo_url) {
-    await supabase.storage.from('group-photos').remove([`${group.id}/photo.jpg`]).catch(() => {})
+    await supabase.storage.from(BUCKET.groupPhotos).remove([groupPhotoPath(group.id)]).catch(() => {})
   }
   const { error } = await supabase.rpc('leave_group', { p_gid: group.id })
   if (error) throw new Error('그룹 나가기에 실패했어요. 잠시 후 다시 시도해 주세요.')
@@ -204,12 +210,12 @@ export async function leaveGroup(group) {
 // ── 그룹 사진 (그룹장 전용) ─────────────────
 export async function uploadGroupPhoto(groupId, dataUrl) {
   const blob = await (await fetch(dataUrl)).blob()
-  const path = `${groupId}/photo.jpg`
+  const path = groupPhotoPath(groupId)
   const { error } = await supabase.storage
-    .from('group-photos')
+    .from(BUCKET.groupPhotos)
     .upload(path, blob, { upsert: true, contentType: 'image/jpeg' })
   if (error) throw new Error('그룹 사진 업로드에 실패했어요.')
-  const { data } = supabase.storage.from('group-photos').getPublicUrl(path)
+  const { data } = supabase.storage.from(BUCKET.groupPhotos).getPublicUrl(path)
   const url = `${data.publicUrl}?t=${Date.now()}`
   const { error: setErr } = await supabase.rpc('set_group_photo', { p_gid: groupId, p_url: url })
   if (setErr) throw new Error(setErr.message || '그룹 사진 저장에 실패했어요.')
@@ -219,7 +225,7 @@ export async function uploadGroupPhoto(groupId, dataUrl) {
 export async function removeGroupPhoto(groupId) {
   const { error } = await supabase.rpc('set_group_photo', { p_gid: groupId, p_url: null })
   if (error) throw new Error(error.message || '그룹 사진 삭제에 실패했어요.')
-  await supabase.storage.from('group-photos').remove([`${groupId}/photo.jpg`]).catch(() => {})
+  await supabase.storage.from(BUCKET.groupPhotos).remove([groupPhotoPath(groupId)]).catch(() => {})
 }
 
 // 그룹 멤버 + 최근 7일 운동현황 + 오늘의 인증샷
@@ -284,9 +290,9 @@ export async function resetServerWorkouts() {
   const user_id = await uid()
   if (!user_id) return true // 비회원: 서버 데이터 없음
   try {
-    const { data: files } = await supabase.storage.from('photos').list(user_id, { limit: 1000 })
+    const { data: files } = await supabase.storage.from(BUCKET.photos).list(user_id, { limit: 1000 })
     if (files?.length) {
-      await supabase.storage.from('photos').remove(files.map(f => `${user_id}/${f.name}`))
+      await supabase.storage.from(BUCKET.photos).remove(files.map(f => inFolder(user_id, f.name)))
     }
   } catch { /* 사진 삭제 실패는 기록 삭제를 막지 않음 */ }
   const { error } = await supabase.from('workouts').delete().eq('user_id', user_id)
