@@ -7,6 +7,7 @@
 
 -- ── profiles: 본인만 전체 조회 가능 ──────────────
 drop policy if exists "profiles: 누구나 닉네임 조회" on public.profiles;
+drop policy if exists "profiles: 본인 전체 조회" on public.profiles;
 create policy "profiles: 본인 전체 조회" on public.profiles
   for select using (auth.uid() = id);
 
@@ -22,14 +23,8 @@ $$;
 
 -- ── groups: 초대코드 전체 공개 차단, 본인 소속 그룹만 조회 ──
 drop policy if exists "groups: 누구나 조회(초대코드 검증용)" on public.groups;
+drop policy if exists "groups: 본인 소속 그룹 조회" on public.groups;
 create policy "groups: 본인 소속 그룹 조회" on public.groups
   for select using (auth.uid() = created_by or public.is_group_member(id));
 
--- 초대코드 단건 조회 전용 (전체 목록 열람은 불가, 정확한 코드를 아는 사람만 조회)
-create or replace function public.find_group_by_invite_code(code text)
-returns table(id uuid, name text, invite_code text, max_members int, members_only boolean)
-language sql security definer set search_path = public as $$
-  select g.id, g.name, g.invite_code, g.max_members, g.members_only
-  from public.groups g
-  where g.invite_code = code;
-$$;
+-- (예전의 find_group_by_invite_code 함수는 join_group 으로 대체되어 v0.6-security.sql 에서 삭제됨)

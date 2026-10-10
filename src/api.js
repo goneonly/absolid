@@ -131,6 +131,24 @@ export async function fetchMyAvatarUrl() {
   return data?.avatar_url || null
 }
 
+// 내 이름·전화번호 (가입 때 입력한 값 — '회원만 받기' 그룹 참여 조건)
+export async function fetchMyProfileInfo() {
+  const user_id = await uid()
+  if (!user_id) return null
+  const { data, error } = await supabase
+    .from('profiles').select('full_name, phone').eq('id', user_id).maybeSingle()
+  if (error) throw new Error('회원 정보를 불러오지 못했어요.')
+  return { fullName: data?.full_name || '', phone: data?.phone || '' }
+}
+
+export async function updateMyProfileInfo({ fullName, phone }) {
+  const user_id = await uid()
+  if (!user_id) throw new Error('로그인이 필요해요.')
+  const { error } = await supabase
+    .from('profiles').update({ full_name: fullName, phone }).eq('id', user_id)
+  if (error) throw new Error('회원 정보 저장에 실패했어요.')
+}
+
 export async function deleteAvatar() {
   const user_id = await uid()
   if (!user_id) return
@@ -305,12 +323,15 @@ export async function resetServerWorkouts() {
   return !count
 }
 
-// 비회원 시절 로컬 기록을 서버로 올리기 (로그인 직후 1회)
+// 비회원 시절 로컬 기록을 서버로 올리기 (로그인 직후 1회, 오늘·어제 기록만)
 export async function syncLocalToServer() {
   const user_id = await uid()
   if (!user_id) return
+  // 서버는 오늘·어제 날짜 기록만 받음 (v0.6-security.sql) — 더 오래된 기록이 섞이면 한 번에 올리는 요청 전체가 거부됨
+  const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1)
+  const minKey = todayKey(yesterday)
   const rows = Object.entries(getRecords())
-    .filter(([, v]) => v.completed)
+    .filter(([date, v]) => v.completed && date >= minKey)
     .map(([date, v]) => ({
       user_id, date, day: v.day || 1,
       completed_at: v.completedAt || new Date().toISOString(),

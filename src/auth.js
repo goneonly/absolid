@@ -4,19 +4,11 @@ import {
   clearLocalUserData, clearAllAppData,
   loadPendingProfile, savePendingProfile, clearPendingProfile,
 } from './storage.js'
-
-const ERROR_KO = {
-  'Invalid login credentials': '이메일 또는 비밀번호가 올바르지 않아요.',
-  'User already registered': '이미 가입된 이메일이에요.',
-  'Password should be at least 6 characters.': '비밀번호는 6자 이상이어야 해요.',
-  'Email not confirmed': '이메일 인증이 필요해요. 메일함을 확인해 주세요.',
-  'Unable to validate email address: invalid format': '이메일 형식이 올바르지 않아요.',
-}
-function ko(msg) { return ERROR_KO[msg] || `오류: ${msg}` }
+import { authErrorMessage } from './authErrors.js'
 
 export async function signUp(email, password, nickname, fullName, phone) {
   const { data, error } = await supabase.auth.signUp({ email, password })
-  if (error) return { error: ko(error.message) }
+  if (error) return { error: authErrorMessage(error) }
   const profile = {
     nickname: nickname || fullName || '',
     full_name: fullName || '',
@@ -47,7 +39,7 @@ export async function flushPendingProfile() {
 
 export async function signIn(email, password) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-  if (error) return { error: ko(error.message) }
+  if (error) return { error: authErrorMessage(error) }
   return { data }
 }
 
@@ -62,7 +54,7 @@ export async function sendPasswordReset(email) {
   const { error } = await supabase.auth.resetPasswordForEmail((email || '').trim(), {
     redirectTo: window.location.origin,
   })
-  if (error) return { error: ko(error.message) }
+  if (error) return { error: authErrorMessage(error) }
   return { data: true }
 }
 
@@ -70,7 +62,7 @@ export async function sendPasswordReset(email) {
 export async function updatePassword(newPassword) {
   if (!supabase) return { error: '서버가 연결되어 있지 않아요.' }
   const { error } = await supabase.auth.updateUser({ password: newPassword })
-  if (error) return { error: ko(error.message) }
+  if (error) return { error: authErrorMessage(error) }
   return { data: true }
 }
 

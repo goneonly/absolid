@@ -1,43 +1,64 @@
-# Absolid  — Abs + Solid 💪
+# Absolid — Abs + Solid 💪
 
-초대 코드로 그룹을 만들어 날짜에 맞춰 복근 운동을 함께 하고 기록하는 모바일 웹앱.
+친구들과 그룹을 만들어 매일 복근 운동을 함께 하고 기록하는 모바일 웹앱(PWA)
 
-## 개발 진행 상황
-- [x] Day 1: 앱 뼈대 — 홈(streak), 운동 페이지(날짜별 영상 + 종료 감지), 완료 모달(사진 첨부), 하단바, 디자인 시스템
-- [x] Day 2: Supabase 연동 코드 (회원가입/로그인 UI, 기록 동기화, DB 스키마) — 프로젝트 키 연결만 남음 (SUPABASE_SETUP.md)
-- [x] Day 3–4: 그룹 만들기/초대 코드 참여, 멤버 운동현황 색상 표시(오늘 + 최근 7일)
-- [x] Day 5: 사진 업로드 서버 저장 (Supabase Storage — supabase/storage.sql 실행 필요)
-- [x] Day 6: 설정 고도화, 기록 CSV 내보내기(구글시트 호환) — 구글 로그인은 옵션이라 보류
-- [x] Day 7: 검증 + Vercel 배포 (https://absolid.vercel.app)
-- [x] Day 8: 미운동 리마인더 — 홈 배너(저녁 6시 이후) + 브라우저 푸시(매일 KST 20시, NOTIFICATIONS_SETUP.md)
-- [x] v0.4: 보안·버그 패치(권한상승 차단·관리자 조회 복구·인증샷 비공개 signed URL·원자적 그룹참여), 비밀번호 재설정, 회원 탈퇴, 주간 리포트, CI(GitHub Actions) — `supabase/security-and-fixes.sql` 실행 필요
-- [x] v0.5: 여러 그룹 참여(그룹 홈 목록), 그룹 사진, 그룹장 자동 위임, 점검 오류 수정 — `supabase/v0.5-groups-and-fixes.sql` 실행 + `delete-account` 재배포 필요
+**🔗 https://absolid.vercel.app**
 
-## 실행 방법 (개발자용)
+## 주요 기능
+
+- **매일 운동** — 날짜에 맞는 Day 1~30 영상을 끝까지 보면 자동 완료, 인증샷 첨부
+- **기록** — 연속 streak, 주간 리포트, CSV 내보내기
+- **그룹** — 초대 코드로 여러 그룹 참여, 멤버 현황·리더보드·오늘의 인증샷, 그룹 사진
+- **알림** — 저녁에 운동 안 했으면 홈 배너 + 브라우저 푸시
+- **비회원 모드** — 로그인 없이 기기에 기록 (로그인하면 서버로 동기화)
+- **관리자** — 대시보드, 회원·그룹·신고·공지 관리
+
+## 기술 스택
+
+React 18 · Vite 5 · Tailwind CSS 4 · Supabase (Auth · Postgres · Storage · Edge Functions) · Vercel
+
+## 시작하기
+
 ```bash
 npm install
-npm run dev      # 개발 서버
-npm run build    # 배포용 빌드
+cp .env.example .env   # Supabase 키 입력 (없으면 비회원 모드로만 동작)
+npm run dev
 ```
 
-## 구조
-- `src/supabase.js` — Supabase 클라이언트 (.env 키 없으면 로컬 모드)
-- `src/auth.js`, `src/useAuth.js` — 회원가입/로그인/세션
-- `src/api.js` — 운동 기록 서버 동기화
-- `supabase/schema.sql` — DB 테이블 + 보안 정책(RLS)
-- `src/index.css` — Tailwind CSS v4 디자인 토큰(색상·폰트 크기·라운드)
-- `src/components/ui.jsx` — 공통 UI 컴포넌트(Card, Button, Modal, Field 등)
-- `src/App.jsx` — 화면 전환(홈/운동/그룹/설정)
-- `src/pages/` — Home(streak), Workout(영상+완료감지), Group, Settings
-- `src/components/` — BottomNav(그룹|시작|설정), CompleteModal(사진 첨부)
-- `src/storage.js` — 기록/streak 계산 (현재 localStorage, Day 2에 Supabase로 확장)
-- `src/youtube.js` — YouTube IFrame API 로더, 플레이리스트 ID
-- `src/push.js`, `public/sw.js` — 브라우저 푸시 구독/수신 (Day 8)
-- `supabase/functions/send-reminders/` — 미운동 회원 푸시 발송 Edge Function (Day 8)
+| 명령어 | 설명 |
+|---|---|
+| `npm run dev` | 개발 서버 |
+| `npm run build` | 배포용 빌드 |
+| `npm run lint` | ESLint 검사 (CI에서 빌드와 함께 실행) |
+
+서버 설정은 문서를 참고하세요.
+
+- [Supabase 설정](docs/SUPABASE_SETUP.md) — DB·스토리지·SQL 실행 순서·Edge Function 배포
+- [푸시 알림 설정](docs/NOTIFICATIONS_SETUP.md) — VAPID 키·리마인더 발송
+
+## 프로젝트 구조
+
+```
+src/
+├── pages/          # 화면: Login, Home, Workout, Group, Settings, Admin
+├── components/     # ui.jsx(공통 UI), 모달, 리더보드, 주간 리포트
+├── api.js          # 서버 통신 (기록·그룹·사진)
+├── auth.js         # 회원가입·로그인·탈퇴
+├── admin.js        # 관리자 기능
+├── storage.js      # 기기 저장소(localStorage) — 키는 이 파일에서만 관리
+├── storagePaths.js # Storage 버킷·파일 경로 규칙
+└── index.css       # 디자인 토큰 (색상·폰트 크기·라운드)
+supabase/
+├── *.sql           # DB 스키마·보안 정책 (실행 순서는 Supabase 설정 문서)
+└── functions/      # delete-account(회원 탈퇴), send-reminders(푸시 발송)
+```
 
 ## 핵심 규칙
-- 오늘의 영상 = 이번 달 "일(day)" 번째 영상, 31일은 Day 30
-- 영상이 끝나야(다음 영상으로 넘어가거나 ENDED) 운동 완료 처리
 
+- 오늘의 영상은 이번 달 날짜와 같은 Day (31일은 Day 30)
+- 영상이 끝나야(다음 영상으로 넘어가거나 종료) 운동 완료로 기록
+- 스타일은 `index.css`에 정의된 토큰만 사용 (임의 색상·크기 금지)
+
+---
 
 Personal Project w/ Full Vibe Coding

@@ -4,9 +4,4 @@
 alter table public.groups
   add column if not exists members_only boolean not null default false;
 
--- 2) 그룹 인원 수 조회 함수
--- 비멤버는 RLS 때문에 group_members를 셀 수 없으므로 security definer로 제공
-create or replace function public.group_member_count(gid uuid)
-returns int language sql security definer set search_path = public as $$
-  select count(*)::int from public.group_members where group_id = gid;
-$$;
+-- (예전의 group_member_count 함수는 앱에서 쓰지 않아 v0.6-security.sql 에서 삭제됨)

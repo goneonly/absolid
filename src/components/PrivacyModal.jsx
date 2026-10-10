@@ -1,10 +1,10 @@
 import { Button, Modal, ModalTitle } from "./ui.jsx";
 
 // ── 개인정보 처리 동의 전문 모달 ───────────────
-export default function PrivacyModal({ onClose }) {
+export default function PrivacyModal({ onClose, title = "개인정보 처리 동의 (필수)" }) {
   return (
-    <Modal label="개인정보 처리 동의" onBackdrop={onClose} className="max-h-[80dvh] overflow-y-auto">
-      <ModalTitle>개인정보 처리 동의 (필수)</ModalTitle>
+    <Modal label={title} onBackdrop={onClose} className="max-h-[80dvh] overflow-y-auto">
+      <ModalTitle>{title}</ModalTitle>
       <div className="mt-3.5 text-sm text-dim [&_li]:mt-1 [&_strong]:mt-3.5 [&_strong]:block [&_strong]:text-fg [&_ul]:mt-1.5 [&_ul]:ml-4.5 [&_ul]:list-disc [&>p]:mt-2">
         <p>
           본 서비스는 회원가입 및 운동 기록 관리 서비스를 제공하기 위해

@@ -7,13 +7,21 @@ import {
   todayKey,
 } from "../storage.js";
 import { supabase } from "../supabase.js";
-import { signIn, signOut, saveNickname, deleteAccount } from "../auth.js";
-import { uploadAvatar, deleteAvatar, fetchMyAvatarUrl, resetServerWorkouts } from "../api.js";
+import { signIn, signOut, saveNickname, deleteAccount, updatePassword } from "../auth.js";
+import {
+  uploadAvatar, deleteAvatar, fetchMyAvatarUrl, resetServerWorkouts,
+  fetchMyProfileInfo, updateMyProfileInfo,
+} from "../api.js";
 import { isPushSupported, getPushEnabled, enablePush, disablePush } from "../push.js";
 import { toast } from "../toast.js";
 import { compressImage } from "../image.js";
+import { isStandalone, isIOS, canPromptInstall, promptInstall } from "../install.js";
+import PrivacyModal from "../components/PrivacyModal.jsx";
+import { INVALID_CREDENTIALS } from "../authErrors.js";
 import {
+  Banner,
   Button,
+  cx,
   Card,
   CardTitle,
   Field,
@@ -27,24 +35,27 @@ import {
   RowButton,
   Sub,
 } from "../components/ui.jsx";
-import { validateNickname } from "../validation.js";
+import {
+  validateNickname, validateName, validatePhone, formatPhone, validatePassword,
+} from "../validation.js";
 
 export default function Settings({ session, onChanged, isAdmin, onOpenAdmin, onRequestLogin }) {
   const [nickname, setNickname] = useState(getProfile().nickname);
-  const [nickError, setNickError] = useState("");
-  const [saved, setSaved] = useState(false);
+  const [showNickname, setShowNickname] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
   const [askExport, setAskExport] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
+  const [showPwChange, setShowPwChange] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showInstall, setShowInstall] = useState(false);
 
-  async function save() {
-    const err = validateNickname(nickname);
-    setNickError(err);
-    if (err) return;
-    saveProfile({ ...getProfile(), nickname: nickname.trim() });
-    if (session) await saveNickname(nickname.trim());
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
-    onChanged();
+  // 홈 화면에 앱 추가: 설치 창을 띄울 수 있으면 바로, 아니면(아이폰 등) 방법 안내
+  async function installApp() {
+    if (canPromptInstall()) {
+      if (await promptInstall()) toast("홈 화면에 Absolid를 추가했어요.");
+    } else {
+      setShowInstall(true);
+    }
   }
 
   // 기록을 CSV로 내려받기 — 구글시트에서 파일 > 가져오기로 바로 열 수 있어요 (Day 6)
@@ -130,6 +141,7 @@ export default function Settings({ session, onChanged, isAdmin, onOpenAdmin, onR
           ? `${session.user.email} 계정으로 이용 중이에요.`
           : "비회원 모드예요 (기기 저장)"}
       </Sub>
+      {!session && <GuestNotice />}
 
       <Card>
         <ProfilePhoto
@@ -137,25 +149,23 @@ export default function Settings({ session, onChanged, isAdmin, onOpenAdmin, onR
           session={session}
           onChanged={onChanged}
         />
-        <CardTitle className="mt-4.5">내 프로필</CardTitle>
-        <Field
-          id="nick"
-          label="닉네임"
-          value={nickname}
-          placeholder="그룹에 표시될 이름"
-          maxLength={12}
-          error={nickError}
-          onChange={(e) => {
-            setNickname(e.target.value);
-            setNickError("");
-          }}
-        />
-        <Button variant="secondary" className="mt-3.5" onClick={save}>
-          {saved ? "저장됐어요 ✓" : "저장"}
-        </Button>
+        <CardTitle className="mt-4.5 mb-1.5">내 프로필</CardTitle>
+        <RowButton hint={nickname?.trim() || "설정 안 됨"} onClick={() => setShowNickname(true)}>
+          닉네임 변경
+        </RowButton>
+        {session && (
+          <RowButton hint="그룹 멤버에게는 비공개" onClick={() => setShowInfo(true)}>
+            이름·전화번호 변경
+          </RowButton>
+        )}
+        {session && (
+          <RowButton hint="현재 비밀번호 확인 후 변경" onClick={() => setShowPwChange(true)}>
+            비밀번호 변경
+          </RowButton>
+        )}
         {/* 비회원: 첫 화면(로그인)으로 이동 — 회원가입도 거기서 */}
         {!session && supabase && (
-          <Button className="mt-2.5" onClick={onRequestLogin}>
+          <Button className="mt-3.5" onClick={onRequestLogin}>
             로그인하기
           </Button>
         )}
@@ -171,6 +181,11 @@ export default function Settings({ session, onChanged, isAdmin, onOpenAdmin, onR
 
       <Card>
         <CardTitle className="mb-1.5">기타</CardTitle>
+        {!isStandalone() && (
+          <RowButton hint={isIOS() ? "아이폰 알림 받으려면 필요" : "앱처럼 바로 실행"} onClick={installApp}>
+            홈 화면에 앱 추가
+          </RowButton>
+        )}
         <PushToggleRow session={session} />
         <RowButton hint="구글시트에서 열기 가능" onClick={() => setAskExport(true)}>
           기록 내보내기 (CSV)
@@ -201,6 +216,10 @@ export default function Settings({ session, onChanged, isAdmin, onOpenAdmin, onR
           LinkedIn
         </a>
         <span aria-hidden="true">·</span>
+        <button className="hover:text-fg hover:underline" onClick={() => setShowPrivacy(true)}>
+          개인정보 처리방침
+        </button>
+        <span aria-hidden="true">·</span>
         <a
           href="https://github.com/goneonly/absolid"
           target="_blank"
@@ -209,6 +228,24 @@ export default function Settings({ session, onChanged, isAdmin, onOpenAdmin, onR
           GitHub
         </a>
       </div>
+
+      {showPrivacy && <PrivacyModal title="개인정보 처리방침" onClose={() => setShowPrivacy(false)} />}
+      {showInstall && <InstallGuideModal onClose={() => setShowInstall(false)} />}
+      {showNickname && (
+        <NicknameModal
+          session={session}
+          initial={nickname}
+          onSaved={(v) => {
+            setNickname(v);
+            onChanged();
+          }}
+          onClose={() => setShowNickname(false)}
+        />
+      )}
+      {showInfo && session && <ProfileInfoModal onClose={() => setShowInfo(false)} />}
+      {showPwChange && session && (
+        <ChangePasswordModal email={session.user.email} onClose={() => setShowPwChange(false)} />
+      )}
 
       {showDelete && session && (
         <DeleteAccountModal
@@ -530,6 +567,283 @@ function DeleteAccountModal({ email, onClose }) {
       </Button>
       <Button variant="secondary" className="mt-2.5" disabled={busy} onClick={onClose}>
         취소
+      </Button>
+    </Modal>
+  );
+}
+
+// ── 비회원 안내: 기록이 이 기기에만 있다는 경고 ──
+function GuestNotice() {
+  const count = Object.values(getRecords()).filter((r) => r?.completed).length;
+  return (
+    <Banner className="mt-4 mb-0">
+      ⚠️ {count > 0 ? `운동 기록 ${count}개가 이 기기에만 저장돼 있어요.` : "비회원 기록은 이 기기에만 저장돼요."}
+      <br />
+      브라우저 데이터를 지우면 사라지고, 나중에 로그인해도 오늘·어제 기록만 계정으로 옮겨져요.
+    </Banner>
+  );
+}
+
+// ── 닉네임 변경 ──
+function NicknameModal({ session, initial, onSaved, onClose }) {
+  const [value, setValue] = useState(initial || "");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    const err = validateNickname(value);
+    setError(err);
+    if (err) return;
+    const nick = value.trim();
+    setBusy(true);
+    saveProfile({ ...getProfile(), nickname: nick });
+    if (session) await saveNickname(nick);
+    setBusy(false);
+    onSaved(nick);
+    toast("닉네임을 변경했어요.");
+    onClose();
+  }
+
+  return (
+    <Modal label="닉네임 변경" onBackdrop={busy ? undefined : onClose}>
+      <ModalTitle>닉네임 변경 ✏️</ModalTitle>
+      <ModalText>그룹에서 다른 멤버에게 보이는 이름이에요.</ModalText>
+      <Field
+        id="nick"
+        label="닉네임 (2~12자, 한글·영문·숫자·_)"
+        className="mt-3"
+        autoFocus
+        value={value}
+        placeholder="그룹에 표시될 이름"
+        maxLength={12}
+        error={error}
+        onChange={(e) => {
+          setValue(e.target.value);
+          setError("");
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") submit();
+        }}
+      />
+      <Button className="mt-3.5" disabled={busy} onClick={submit}>
+        {busy ? "저장 중…" : "저장"}
+      </Button>
+      <Button variant="secondary" className="mt-2.5" disabled={busy} onClick={onClose}>
+        취소
+      </Button>
+    </Modal>
+  );
+}
+
+// ── 이름·전화번호 변경 (가입 때 입력한 값 — '회원만 받기' 그룹 참여 조건) ──
+function ProfileInfoModal({ onClose }) {
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [errors, setErrors] = useState({});
+  const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    fetchMyProfileInfo()
+      .then((info) => {
+        if (!alive || !info) return;
+        setFullName(info.fullName);
+        setPhone(info.phone);
+        setLoaded(true);
+      })
+      .catch((e) => alive && setLoadError(e.message));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  async function submit() {
+    // 둘 다 선택 입력 — 적었다면 형식 검사
+    const errs = {
+      fullName: fullName.trim() ? validateName(fullName) : "",
+      phone: phone ? validatePhone(phone) : "",
+    };
+    setErrors(errs);
+    if (errs.fullName || errs.phone) return;
+    setBusy(true);
+    try {
+      await updateMyProfileInfo({ fullName: fullName.trim(), phone: phone ? formatPhone(phone) : "" });
+      toast("이름·전화번호를 저장했어요.");
+      onClose();
+    } catch (e) {
+      setErrors({ phone: e.message });
+    }
+    setBusy(false);
+  }
+
+  return (
+    <Modal label="이름·전화번호 변경" onBackdrop={busy ? undefined : onClose}>
+      <ModalTitle>이름·전화번호 변경 📇</ModalTitle>
+      <ModalText>그룹 멤버에게는 보이지 않아요. '회원만 받기' 그룹에 참여하려면 둘 다 필요해요.</ModalText>
+      {!loaded ? (
+        <Sub className={cx("mt-4 text-center", loadError && "text-brand")}>{loadError || "불러오는 중…"}</Sub>
+      ) : (
+        <>
+          <Field
+            id="full-name"
+            label="이름"
+            className="mt-3"
+            value={fullName}
+            maxLength={20}
+            placeholder="홍길동"
+            autoComplete="name"
+            error={errors.fullName}
+            onChange={(e) => {
+              setFullName(e.target.value);
+              setErrors((p) => ({ ...p, fullName: "" }));
+            }}
+          />
+          <Field
+            id="phone"
+            label="전화번호"
+            type="tel"
+            value={phone}
+            maxLength={13}
+            placeholder="010-0000-0000"
+            autoComplete="tel"
+            inputMode="numeric"
+            error={errors.phone}
+            onChange={(e) => {
+              setPhone(formatPhone(e.target.value));
+              setErrors((p) => ({ ...p, phone: "" }));
+            }}
+          />
+        </>
+      )}
+      <Button className="mt-3.5" disabled={busy || !loaded} onClick={submit}>
+        {busy ? "저장 중…" : "저장"}
+      </Button>
+      <Button variant="secondary" className="mt-2.5" disabled={busy} onClick={onClose}>
+        취소
+      </Button>
+    </Modal>
+  );
+}
+
+// ── 비밀번호 변경 (현재 비밀번호로 본인 확인 후) ──
+function ChangePasswordModal({ email, onClose }) {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [errors, setErrors] = useState({});
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    const errs = {
+      current: current ? "" : "현재 비밀번호를 입력해 주세요.",
+      next: validatePassword(next) || (next && next === current ? "현재 비밀번호와 다른 비밀번호를 입력해 주세요." : ""),
+      confirmPw: next === confirmPw ? "" : "새 비밀번호가 서로 달라요.",
+    };
+    setErrors(errs);
+    if (Object.values(errs).some(Boolean)) return;
+    setBusy(true);
+    const check = await signIn(email, current);
+    if (check?.error) {
+      setBusy(false);
+      // 비밀번호 불일치만 '현재 비밀번호' 오류로, 연결 실패 등은 원래 안내 그대로
+      setErrors({ current: check.error === INVALID_CREDENTIALS ? "현재 비밀번호가 올바르지 않아요." : check.error });
+      return;
+    }
+    const res = await updatePassword(next);
+    setBusy(false);
+    if (res?.error) {
+      setErrors({ next: res.error });
+      return;
+    }
+    toast("비밀번호를 변경했어요.");
+    onClose();
+  }
+
+  const clear = (key) => setErrors((p) => ({ ...p, [key]: "" }));
+
+  return (
+    <Modal label="비밀번호 변경" onBackdrop={busy ? undefined : onClose}>
+      <ModalTitle>비밀번호 변경 🔑</ModalTitle>
+      <Field
+        id="pw-current"
+        label="현재 비밀번호"
+        className="mt-3"
+        type="password"
+        autoFocus
+        autoComplete="current-password"
+        value={current}
+        error={errors.current}
+        onChange={(e) => {
+          setCurrent(e.target.value);
+          clear("current");
+        }}
+      />
+      <Field
+        id="pw-next"
+        label="새 비밀번호 (6자 이상, 영문+숫자)"
+        type="password"
+        autoComplete="new-password"
+        value={next}
+        error={errors.next}
+        onChange={(e) => {
+          setNext(e.target.value);
+          clear("next");
+        }}
+      />
+      <Field
+        id="pw-confirm"
+        label="새 비밀번호 확인"
+        type="password"
+        autoComplete="new-password"
+        value={confirmPw}
+        error={errors.confirmPw}
+        onChange={(e) => {
+          setConfirmPw(e.target.value);
+          clear("confirmPw");
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") submit();
+        }}
+      />
+      <Button className="mt-3.5" disabled={busy} onClick={submit}>
+        {busy ? "변경 중…" : "비밀번호 변경"}
+      </Button>
+      <Button variant="secondary" className="mt-2.5" disabled={busy} onClick={onClose}>
+        취소
+      </Button>
+    </Modal>
+  );
+}
+
+// ── 홈 화면에 앱 추가 방법 (설치 창을 띄울 수 없는 브라우저용) ──
+function InstallGuideModal({ onClose }) {
+  const ios = isIOS();
+  const steps = ios
+    ? ["Safari 로 이 사이트를 열어요.", "아래쪽 공유 버튼(□↑)을 눌러요.", "'홈 화면에 추가'를 누르고 '추가'를 눌러요."]
+    : ["Chrome 으로 이 사이트를 열어요.", "오른쪽 위 메뉴(⋮)를 눌러요.", "'앱 설치' 또는 '홈 화면에 추가'를 눌러요."];
+  return (
+    <Modal label="홈 화면에 앱 추가" onBackdrop={onClose}>
+      <ModalTitle>홈 화면에 앱 추가 📲</ModalTitle>
+      <ModalText>앱처럼 바로 실행할 수 있어요.</ModalText>
+      <ol className="mt-4 space-y-2.5 rounded-md bg-surface-2 px-4 py-3.5 text-base">
+        {steps.map((step, i) => (
+          <li key={step} className="flex gap-2.5">
+            <span className="flex size-5.5 flex-none items-center justify-center rounded-full bg-brand text-xs font-bold text-white">
+              {i + 1}
+            </span>
+            {step}
+          </li>
+        ))}
+      </ol>
+      {ios && (
+        <p className="mt-3 text-xs text-dim">
+          아이폰은 홈 화면에 추가한 앱에서만 운동 리마인더 알림을 받을 수 있어요 (iOS 16.4 이상).
+        </p>
+      )}
+      <Button variant="secondary" className="mt-4" onClick={onClose}>
+        확인
       </Button>
     </Modal>
   );

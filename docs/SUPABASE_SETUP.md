@@ -44,6 +44,13 @@
 
 > 이 SQL을 실행한 뒤 아래 2-4의 `delete-account` 엣지 함수를 **다시 배포**해야 탈퇴 시 그룹장 위임이 적용돼요.
 
+## 2-3-2. 보안·무결성 보강 (v0.6, 필수)
+`v0.5-groups-and-fixes.sql` 실행 후, **SQL Editor → New query**에 `supabase/v0.6-security.sql` 내용을 붙여넣고 **Run**. (재실행 안전)
+- **운동 기록 날짜 제한**: 오늘·어제(한국 시간) 날짜만 저장 가능, Day 번호는 서버가 날짜로 계산
+- **프로필 사진 주소 제한**: 본인 프로필 사진 폴더의 주소만 저장 가능
+- **업로드 제한**: 사진 버킷별 5MB, 이미지(JPEG·PNG·WebP)만
+- **정리**: 앱에서 쓰지 않던 공개 함수 2개 삭제
+
 ## 2-4. 회원 탈퇴 기능 (선택 — 엣지 함수)
 계정·데이터 완전 삭제를 켜려면 Supabase CLI로 배포하세요:
 ```bash
@@ -54,10 +61,13 @@ supabase functions deploy delete-account
 ## 2-5. 비밀번호 재설정 메일 (설정 확인)
 **Authentication → URL Configuration**의 **Site URL**에 배포 주소(예: `https://absolid.vercel.app`)를 넣어야 재설정 링크가 앱으로 돌아옵니다. (로컬 테스트는 `http://localhost:5173`)
 
-## 3. 이메일 인증 끄기 (데모용, 선택)
-회원가입 시 메일 인증 없이 바로 로그인되게 하려면:
-1. **Authentication → Sign In / Providers → Email**
-2. **Confirm email** 스위치 끄기 → Save
+## 3. 이메일 인증 (권장: 켜기)
+가입 시 본인 이메일인지 확인하려면 **Authentication → Sign In / Providers → Email → Confirm email** 을 켜세요.
+끄면 다른 사람의 이메일 주소로도 가입할 수 있어요.
+
+> Supabase 기본 메일 서버는 프로젝트 팀원 주소로만, 그것도 시간당 몇 통만 보내요.
+> 일반 사용자에게 인증·비밀번호 재설정 메일이 가려면 **Authentication → Emails → SMTP Settings** 에서
+> 외부 메일 서비스(Resend, Gmail SMTP 등)를 연결해야 해요.
 
 ## 4. 앱에 키 연결하기
 1. **Project Settings(톱니) → API Keys** 에서 두 값을 복사
