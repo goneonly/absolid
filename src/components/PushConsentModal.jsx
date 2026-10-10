@@ -21,7 +21,7 @@ export default function PushConsentModal({ onClose }) {
     setBusy(true);
     try {
       await enablePush();
-      toast("이제 운동 안 한 날 저녁에 알림을 보내드릴게요 🔔");
+      toast("운동 안 한 날 저녁 리마인더와 응원 알림을 보내드릴게요 🔔");
       onClose();
     } catch (e) {
       toast(e.message || "알림 설정에 실패했어요.");
@@ -35,7 +35,7 @@ export default function PushConsentModal({ onClose }) {
       <Modal label="알림 안내">
         <ModalTitle>알겠어요 👌</ModalTitle>
         <ModalText>
-          운동 리마인더 알림은 <strong>설정 → 기타</strong>에서 언제든 켤 수 있어요.
+          알림은 <strong>설정 → 기타</strong>에서 언제든 켤 수 있어요.
         </ModalText>
       </Modal>
     );
@@ -43,9 +43,9 @@ export default function PushConsentModal({ onClose }) {
 
   return (
     <Modal label="푸시 알림 동의">
-      <ModalTitle>운동 리마인더 알림 🔔</ModalTitle>
+      <ModalTitle>알림 받기 🔔</ModalTitle>
       <ModalText>
-        운동을 안 한 날 저녁에 브라우저 알림으로 알려드릴까요? 꾸준한 streak에
+        운동을 안 한 날 저녁, 그리고 그룹 멤버가 응원을 보냈을 때 알려드릴까요? 꾸준한 streak에
         도움이 돼요.
       </ModalText>
       <Button className="mt-4.5" disabled={busy} onClick={agree}>

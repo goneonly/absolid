@@ -19,7 +19,7 @@ import {
 } from './storage.js'
 import { useAuth } from './useAuth.js'
 import { flushPendingProfile, signOut } from './auth.js'
-import { fetchServerRecords, syncLocalToServer, cleanupOldServerPhotos } from './api.js'
+import { fetchServerRecords, retryPendingCompletions, cleanupOldServerPhotos } from './api.js'
 import { fetchMyRole } from './admin.js'
 
 
@@ -79,13 +79,14 @@ export default function App() {
     return () => { alive = false }
   }, [session])
 
-  // 로그인되면: 서버 기록 내려받아 병합 + 비회원 시절 로컬 기록 서버로 업로드
+  // 로그인되면: 연결 문제로 못 남긴 완료 기록 재시도 + 서버 기록 내려받아 병합
+  // (비회원 시절 기록은 시청 확인이 없어 서버로 올리지 않음 — 기기에만 남음)
   // + 하루 1회, 30일 지난 내 서버 인증샷 정리
   useEffect(() => {
     if (!session) return
     let alive = true
     flushPendingProfile().catch(() => {}) // 가입 시 못 올린 이름·전화번호 반영
-    syncLocalToServer()
+    retryPendingCompletions()
       .then(fetchServerRecords)
       .then(server => { if (alive && server) { mergeRecords(server); refresh() } })
       .catch(() => {})
@@ -122,7 +123,7 @@ export default function App() {
         {session && <span className="rounded-sm bg-surface-2 px-2 py-0.5 text-2xs font-bold text-dim">로그인됨</span>}
       </header>
 
-      {view === 'home' && <Home records={records} onStart={() => setView('workout')} />}
+      {view === 'home' && <Home records={records} session={session} onStart={() => setView('workout')} />}
       {view === 'workout' && <Workout session={session} onDone={() => { refresh(); setView('home') }} />}
       {/* 계정이 바뀌면 화면 상태(닉네임 입력값·선택한 그룹 등)를 새로 시작 */}
       {view === 'group' && <Group key={accountKey} records={records} session={session} />}

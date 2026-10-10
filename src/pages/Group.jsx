@@ -3,7 +3,7 @@ import { todayKey, lastNDays, getProfile } from '../storage.js'
 import { supabase } from '../supabase.js'
 import {
   fetchMyGroups, createGroup, joinGroup, leaveGroup, fetchGroupStatus,
-  uploadGroupPhoto, removeGroupPhoto,
+  uploadGroupPhoto, removeGroupPhoto, sendCheer, notifyCheer, fetchTodayCheers,
 } from '../api.js'
 import { submitReport } from '../admin.js'
 import { toast } from '../toast.js'
@@ -17,7 +17,8 @@ import {
 const WEEK = ['일', '월', '화', '수', '목', '금', '토']
 const OPTION_ROW = 'flex items-center justify-between gap-3 border-b border-line py-3 text-base last:border-b-0'
 
-function MemberRow({ name, isMe, dates, avatar }) {
+// cheer: { count, sent, busy, onCheer } — 로그인 상태의 그룹 화면에서만 전달
+function MemberRow({ name, isMe, dates, avatar, cheer }) {
   const days = lastNDays(7, {})
   const doneToday = dates.has(todayKey())
   return (
@@ -34,9 +35,27 @@ function MemberRow({ name, isMe, dates, avatar }) {
           ))}
         </div>
       </div>
-      <span className={cx('text-xs', doneToday ? 'font-semibold text-brand' : 'text-dim')}>
-        {doneToday ? '오늘 완료' : '아직'}
-      </span>
+      <div className="flex flex-col items-end gap-1.5">
+        <span className={cx('text-xs', doneToday ? 'font-semibold text-brand' : 'text-dim')}>
+          {doneToday ? '오늘 완료' : '아직'}
+        </span>
+        {cheer && (isMe ? (
+          cheer.count > 0 && <span className="text-2xs text-dim">응원 {cheer.count}개 받음</span>
+        ) : (
+          <button
+            className={cx(
+              'rounded-full border px-2.5 py-1 text-2xs font-semibold disabled:opacity-60',
+              cheer.sent ? 'border-line bg-surface-2 text-dim' : 'border-brand/40 bg-brand/15 text-brand',
+            )}
+            disabled={cheer.sent || cheer.busy}
+            onClick={cheer.onCheer}
+            aria-label={`${name}님 응원하기`}
+          >
+            {cheer.sent ? '✓ 응원함' : doneToday ? '👏 잘했어요' : '💪 힘내요'}
+            {cheer.count > 0 && <span className="ml-1 opacity-70">{cheer.count}</span>}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
@@ -245,7 +264,29 @@ function GroupDetail({ group, records, myId, myName, myDates, onBack, onChanged,
   const [loaded, setLoaded] = useState(false)
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [cheers, setCheers] = useState({ counts: {}, byMe: new Set() })
+  const [cheering, setCheering] = useState(null) // 응원 보내는 중인 멤버 id
   const isOwner = group.created_by === myId
+
+  async function cheerFor(member) {
+    setCheering(member.id)
+    try {
+      const cheerId = await sendCheer(group.id, member.id)
+      if (cheerId) {
+        notifyCheer(cheerId) // 받은 사람에게 푸시 (기다리지 않음)
+        toast(`${member.name}님에게 응원을 보냈어요!`)
+      } else {
+        toast('오늘은 이미 응원했어요. 내일 또 응원해 주세요!')
+      }
+      setCheers(prev => ({
+        counts: cheerId ? { ...prev.counts, [member.id]: (prev.counts[member.id] || 0) + 1 } : prev.counts,
+        byMe: new Set([...prev.byMe, member.id]),
+      }))
+    } catch (e) {
+      toast(e.message)
+    }
+    setCheering(null)
+  }
 
   const load = useCallback(async () => {
     setBusy(true)
@@ -253,6 +294,7 @@ function GroupDetail({ group, records, myId, myName, myDates, onBack, onChanged,
       const { members, photos } = await fetchGroupStatus(group.id)
       setMembers(members)
       setPhotos(photos)
+      setCheers(await fetchTodayCheers(members.map(m => m.id)))
     } catch { /* 네트워크 오류 시 조용히 패스 */ }
     setLoaded(true)
     setBusy(false)
@@ -340,6 +382,12 @@ function GroupDetail({ group, records, myId, myName, myDates, onBack, onChanged,
                 isMe={m.id === myId}
                 avatar={m.id === myId ? (getProfile().avatar || m.avatar) : m.avatar}
                 dates={m.id === myId ? new Set([...m.dates, ...myDates]) : m.dates}
+                cheer={{
+                  count: cheers.counts[m.id] || 0,
+                  sent: cheers.byMe.has(m.id),
+                  busy: cheering === m.id,
+                  onCheer: () => cheerFor(m),
+                }}
               />
             ))}
           </div>

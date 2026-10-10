@@ -3,7 +3,7 @@ import { loadYouTubeAPI } from "../youtube.js";
 import { getPlaylistId } from "../admin.js";
 import { todayWorkoutDay, todayKey, saveRecord } from "../storage.js";
 import CompleteModal from "../components/CompleteModal.jsx";
-import { pushRecord, uploadPhoto } from "../api.js";
+import { startWorkoutSession, completeWorkout, uploadPhoto } from "../api.js";
 import { toast } from "../toast.js";
 import { Button, Card, CardTitle, Page, PageTitle, Sub } from "../components/ui.jsx";
 
@@ -15,7 +15,9 @@ export default function Workout({ onDone, session }) {
   const startedRef = useRef(false);
   const finishedRef = useRef(false);
   const startIndexRef = useRef(null); // 실제 시작 인덱스 (요청 인덱스가 클램프될 수 있어 기록)
+  const sessionRef = useRef(null); // 서버 시청 세션 id (Promise) — 회원만
   const [showModal, setShowModal] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [canFinish, setCanFinish] = useState(false);
   const day = todayWorkoutDay();
 
@@ -47,6 +49,8 @@ export default function Workout({ onDone, session }) {
                 // 첫 재생: 실제 시작 인덱스를 기준으로 저장 (요청 인덱스 클램프 대비)
                 startIndexRef.current = idx;
                 startedRef.current = true;
+                // 회원: 서버에 시청 시작 기록 (완료 시 서버가 경과 시간으로 검증)
+                if (session) sessionRef.current = startWorkoutSession(e.target.getDuration());
               } else if (startedRef.current && idx !== startIndexRef.current) {
                 // 다음 영상으로 자동 전환됨 = 오늘 영상 끝
                 e.target.pauseVideo();
@@ -92,29 +96,57 @@ export default function Workout({ onDone, session }) {
     setShowModal(true);
   }
 
-  function handleSave(photo) {
-    const completedAt = new Date().toISOString();
-    // 로컬 저장은 즉시, 서버 저장·업로드는 백그라운드로 (실패 시 토스트 안내)
-    pushRecord(todayKey(), day, completedAt)
-      .then(() => uploadPhoto(todayKey(), photo))
-      .then((url) => {
-        if (session && photo && !url) {
-          toast("인증샷 서버 업로드에 실패했어요. 사진은 이 기기에만 저장돼요.");
-        }
-      })
-      .catch(() => {
-        if (session) {
-          toast("서버 저장에 실패했어요. 다음 접속 때 자동으로 다시 동기화돼요.");
-        }
-      });
-    saveRecord(todayKey(), {
-      completed: true,
-      completedAt,
-      day,
-      ...(photo ? { photo } : {}),
-    });
+  function closeAndReturn() {
+    setSaving(false);
     setShowModal(false);
     onDone();
+  }
+
+  async function handleSave(photo) {
+    const record = (dateKey, extra = {}) =>
+      saveRecord(dateKey, {
+        completed: true,
+        completedAt: new Date().toISOString(),
+        day,
+        ...(photo ? { photo } : {}),
+        ...extra,
+      });
+
+    // 비회원: 기기에만 저장
+    if (!session) {
+      record(todayKey());
+      return closeAndReturn();
+    }
+
+    setSaving(true);
+    const sessionId = await sessionRef.current?.catch(() => null);
+    if (!sessionId) {
+      record(todayKey());
+      toast("시청 기록을 서버에 남기지 못해 이 기기에만 저장했어요.");
+      return closeAndReturn();
+    }
+    try {
+      const dateKey = await completeWorkout(sessionId);
+      record(dateKey);
+      if (photo) {
+        uploadPhoto(dateKey, photo).then((url) => {
+          if (!url) toast("인증샷 서버 업로드에 실패했어요. 사진은 이 기기에만 저장돼요.");
+        });
+      }
+      closeAndReturn();
+    } catch (e) {
+      if (e.retryable) {
+        // 연결 문제: 기기에 먼저 저장하고 다음 접속 때 다시 기록 (App → retryPendingCompletions)
+        record(todayKey(), { pendingSession: sessionId });
+        toast("서버 연결이 불안정해 이 기기에 먼저 저장했어요. 다음 접속 때 다시 기록할게요.");
+        return closeAndReturn();
+      }
+      // 서버가 거절(시청 시간 부족 등): 기록하지 않고 계속 시청할 수 있게 되돌림
+      toast(e.message);
+      finishedRef.current = false;
+      setSaving(false);
+      setShowModal(false);
+    }
   }
 
   return (
@@ -156,6 +188,7 @@ export default function Workout({ onDone, session }) {
       {showModal && (
         <CompleteModal
           day={day}
+          busy={saving}
           onSave={handleSave}
           onSkip={() => handleSave(null)}
         />

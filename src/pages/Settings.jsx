@@ -12,11 +12,11 @@ import {
   uploadAvatar, deleteAvatar, fetchMyAvatarUrl, resetServerWorkouts,
   fetchMyProfileInfo, updateMyProfileInfo,
 } from "../api.js";
-import { isPushSupported, getPushEnabled, enablePush, disablePush } from "../push.js";
+import { isPushSupported, isPushConfigured, getPushEnabled, enablePush, disablePush } from "../push.js";
 import { toast } from "../toast.js";
 import { compressImage } from "../image.js";
 import { isStandalone, isIOS, canPromptInstall, promptInstall } from "../install.js";
-import PrivacyModal from "../components/PrivacyModal.jsx";
+import { PrivacyModal, TermsModal } from "../components/LegalModals.jsx";
 import { INVALID_CREDENTIALS } from "../authErrors.js";
 import {
   Banner,
@@ -47,6 +47,7 @@ export default function Settings({ session, onChanged, isAdmin, onOpenAdmin, onR
   const [showDelete, setShowDelete] = useState(false);
   const [showPwChange, setShowPwChange] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
   const [showInstall, setShowInstall] = useState(false);
 
   // 홈 화면에 앱 추가: 설치 창을 띄울 수 있으면 바로, 아니면(아이폰 등) 방법 안내
@@ -182,11 +183,11 @@ export default function Settings({ session, onChanged, isAdmin, onOpenAdmin, onR
       <Card>
         <CardTitle className="mb-1.5">기타</CardTitle>
         {!isStandalone() && (
-          <RowButton hint={isIOS() ? "아이폰 알림 받으려면 필요" : "앱처럼 바로 실행"} onClick={installApp}>
+          <RowButton hint={isIOS() && isPushConfigured() ? "아이폰 알림 받으려면 필요" : "앱처럼 바로 실행"} onClick={installApp}>
             홈 화면에 앱 추가
           </RowButton>
         )}
-        <PushToggleRow session={session} />
+        <PushToggleRow session={session} onNeedInstall={() => setShowInstall(true)} />
         <RowButton hint="구글시트에서 열기 가능" onClick={() => setAskExport(true)}>
           기록 내보내기 (CSV)
         </RowButton>
@@ -216,6 +217,10 @@ export default function Settings({ session, onChanged, isAdmin, onOpenAdmin, onR
           LinkedIn
         </a>
         <span aria-hidden="true">·</span>
+        <button className="hover:text-fg hover:underline" onClick={() => setShowTerms(true)}>
+          이용약관
+        </button>
+        <span aria-hidden="true">·</span>
         <button className="hover:text-fg hover:underline" onClick={() => setShowPrivacy(true)}>
           개인정보 처리방침
         </button>
@@ -229,7 +234,8 @@ export default function Settings({ session, onChanged, isAdmin, onOpenAdmin, onR
         </a>
       </div>
 
-      {showPrivacy && <PrivacyModal title="개인정보 처리방침" onClose={() => setShowPrivacy(false)} />}
+      {showPrivacy && <PrivacyModal onClose={() => setShowPrivacy(false)} />}
+      {showTerms && <TermsModal onClose={() => setShowTerms(false)} />}
       {showInstall && <InstallGuideModal onClose={() => setShowInstall(false)} />}
       {showNickname && (
         <NicknameModal
@@ -468,7 +474,8 @@ function ProfileName({ nickname }) {
 
 // ── 운동 리마인더 푸시 알림 on/off (기타 카드 내 row) ──
 // 오늘 운동 기록이 없으면 매일 저녁 브라우저 푸시로 알려줍니다 (회원 전용)
-function PushToggleRow({ session }) {
+// onNeedInstall: 아이폰 Safari 처럼 홈 화면에 추가해야 알림을 켤 수 있을 때 설치 안내 열기
+function PushToggleRow({ session, onNeedInstall }) {
   const [enabled, setEnabled] = useState(false);
   const [busy, setBusy] = useState(false);
   const supported = isPushSupported();
@@ -477,8 +484,16 @@ function PushToggleRow({ session }) {
     if (session && supported) getPushEnabled().then(setEnabled);
   }, [session, supported]);
 
-  // 비회원이거나 푸시 미지원 브라우저면 표시하지 않음
-  if (!session || !supported) return null;
+  if (!session || !isPushConfigured()) return null; // 비회원 또는 알림이 꺼진 배포
+  if (!supported) {
+    // 아이폰은 홈 화면에 추가한 앱에서만 알림 API 가 열림 → 방법 안내
+    if (!isIOS() || isStandalone()) return null;
+    return (
+      <RowButton hint="홈 화면에 추가하면 켤 수 있어요" onClick={onNeedInstall}>
+        알림 (리마인더·응원)
+      </RowButton>
+    );
+  }
 
   async function toggle() {
     setBusy(true);
@@ -486,11 +501,11 @@ function PushToggleRow({ session }) {
       if (enabled) {
         await disablePush();
         setEnabled(false);
-        toast("리마인더 알림을 껐어요.");
+        toast("알림을 껐어요.");
       } else {
         await enablePush();
         setEnabled(true);
-        toast("이제 운동 안 한 날 저녁에 알림을 보내드릴게요 🔔");
+        toast("운동 안 한 날 저녁 리마인더와 응원 알림을 보내드릴게요 🔔");
       }
     } catch (e) {
       toast(e.message || "알림 설정에 실패했어요.");
@@ -504,7 +519,7 @@ function PushToggleRow({ session }) {
       hint={busy ? "처리 중…" : enabled ? "켜짐 🔔" : "꺼짐 🔕"}
       onClick={toggle}
     >
-      운동 리마인더 알림
+      알림 (리마인더·응원)
     </RowButton>
   );
 }
@@ -579,7 +594,7 @@ function GuestNotice() {
     <Banner className="mt-4 mb-0">
       ⚠️ {count > 0 ? `운동 기록 ${count}개가 이 기기에만 저장돼 있어요.` : "비회원 기록은 이 기기에만 저장돼요."}
       <br />
-      브라우저 데이터를 지우면 사라지고, 나중에 로그인해도 오늘·어제 기록만 계정으로 옮겨져요.
+      브라우저 데이터를 지우면 사라지고, 로그인해도 계정으로 옮겨지지 않아요. 로그인한 뒤의 운동부터 계정에 기록돼요.
     </Banner>
   );
 }
@@ -837,7 +852,8 @@ function InstallGuideModal({ onClose }) {
           </li>
         ))}
       </ol>
-      {ios && (
+      {/* 푸시 알림이 실제로 켜진 배포에서만 안내 (VAPID 키가 없으면 알림 기능 자체가 숨겨짐) */}
+      {ios && isPushConfigured() && (
         <p className="mt-3 text-xs text-dim">
           아이폰은 홈 화면에 추가한 앱에서만 운동 리마인더 알림을 받을 수 있어요 (iOS 16.4 이상).
         </p>

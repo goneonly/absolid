@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { Button, Modal, ModalText, ModalTitle } from './ui.jsx'
 import { compressImage } from '../image.js'
 
-export default function CompleteModal({ day, onSave, onSkip }) {
+export default function CompleteModal({ day, busy, onSave, onSkip }) {
   const fileRef = useRef(null)
   const [photo, setPhoto] = useState(null)
 
@@ -25,10 +25,10 @@ export default function CompleteModal({ day, onSave, onSkip }) {
       </button>
       <input ref={fileRef} type="file" accept="image/*" hidden onChange={handleFile} />
 
-      <Button className="mt-5" onClick={() => onSave(photo)}>
-        {photo ? '사진과 함께 업로드' : '완료 기록하기'}
+      <Button className="mt-5" disabled={busy} onClick={() => onSave(photo)}>
+        {busy ? '기록하는 중…' : photo ? '사진과 함께 업로드' : '완료 기록하기'}
       </Button>
-      <Button variant="secondary" className="mt-2.5" onClick={onSkip}>
+      <Button variant="secondary" className="mt-2.5" disabled={busy} onClick={onSkip}>
         사진 없이 완료
       </Button>
     </Modal>

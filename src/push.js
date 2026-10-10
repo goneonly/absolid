@@ -4,6 +4,11 @@ import { supabase } from './supabase.js'
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || ''
 
+// 서버·키 설정상 알림 기능이 켜진 배포인지 (브라우저 지원과 별개)
+export function isPushConfigured() {
+  return !!(supabase && VAPID_PUBLIC_KEY)
+}
+
 export function isPushSupported() {
   return !!(supabase && VAPID_PUBLIC_KEY &&
     'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window)
@@ -48,18 +53,11 @@ export async function enablePush() {
     applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
   })
   const json = sub.toJSON()
-  const { error } = await supabase.from('push_subscriptions').upsert(
-    { user_id, endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth },
-    { onConflict: 'endpoint' }
-  )
-  if (error) {
-    // 테이블이 아직 없는 경우(notifications.sql 미실행)를 구분해 안내
-    const msg = String(error.message || '')
-    if (msg.includes('push_subscriptions') || error.code === '42P01' || error.code === 'PGRST205') {
-      throw new Error('서버에 알림 테이블이 없어요. supabase/notifications.sql을 실행해 주세요.')
-    }
-    throw new Error('구독 저장에 실패했어요. 잠시 후 다시 시도해 주세요.')
-  }
+  // 서버 함수로 등록 — 이 기기에서 다른 계정이 켰던 구독도 현재 계정으로 옮김 (v0.8 SQL)
+  const { error } = await supabase.rpc('register_push', {
+    p_endpoint: json.endpoint, p_p256dh: json.keys.p256dh, p_auth: json.keys.auth,
+  })
+  if (error) throw new Error('알림 등록에 실패했어요. 잠시 후 다시 시도해 주세요.')
   return true
 }
 

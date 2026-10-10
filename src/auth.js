@@ -5,14 +5,17 @@ import {
   loadPendingProfile, savePendingProfile, clearPendingProfile,
 } from './storage.js'
 import { authErrorMessage } from './authErrors.js'
+import { disablePush } from './push.js'
 
-export async function signUp(email, password, nickname, fullName, phone) {
+// consent: { age_over_14, terms_version, terms_agreed_at } — 가입 화면에서 받은 필수 동의 기록
+export async function signUp(email, password, nickname, fullName, phone, consent = {}) {
   const { data, error } = await supabase.auth.signUp({ email, password })
   if (error) return { error: authErrorMessage(error) }
   const profile = {
     nickname: nickname || fullName || '',
     full_name: fullName || '',
     phone: phone || '',
+    ...consent,
   }
   if (data.session && data.user) {
     await supabase.from('profiles').upsert({ id: data.user.id, ...profile })
@@ -44,6 +47,8 @@ export async function signIn(email, password) {
 }
 
 export async function signOut() {
+  // 이 기기 알림 구독 해제 — 남겨두면 로그아웃한 계정의 알림이 계속 옴 (느린 네트워크에서도 3초 이상 기다리지 않음)
+  await Promise.race([disablePush(), new Promise((r) => setTimeout(r, 3000))])
   clearLocalUserData() // 세션 변경으로 화면이 다시 그려지기 전에 먼저 정리
   await supabase.auth.signOut()
 }

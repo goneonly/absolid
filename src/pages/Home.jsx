@@ -3,21 +3,30 @@ import {
   computeStreak, todayKey, todayWorkoutDay, isReminderDismissedToday, dismissReminderToday,
 } from '../storage.js'
 import { fetchActiveAnnouncement } from '../admin.js'
+import { fetchReceivedCheers } from '../api.js'
 import WeeklyReport from '../components/WeeklyReport.jsx'
 import { Banner, Card, Page, PageTitle, Sub, cx } from '../components/ui.jsx'
 
 const REMIND_AFTER_HOUR = 18 // 저녁 6시 이후부터 리마인더 표시
 
-export default function Home({ records, onStart }) {
+export default function Home({ records, onStart, session }) {
   const streak = computeStreak(records)
   const doneToday = !!records[todayKey()]?.completed
   const day = todayWorkoutDay()
   const [notice, setNotice] = useState(null)
+  const [cheers, setCheers] = useState([]) // 오늘 받은 응원 (회원)
   const [remindDismissed, setRemindDismissed] = useState(isReminderDismissedToday)
 
   useEffect(() => {
     fetchActiveAnnouncement().then(setNotice)
   }, [])
+
+  useEffect(() => {
+    if (!session) return
+    let alive = true
+    fetchReceivedCheers().then((list) => alive && setCheers(list))
+    return () => { alive = false }
+  }, [session])
 
   // 앱 내 리마인더: 저녁이 됐는데 오늘 기록이 없으면 배너 표시 (하루 1회 닫기 가능)
   const showReminder =
@@ -40,6 +49,7 @@ export default function Home({ records, onStart }) {
           </span>
         </Banner>
       )}
+      {cheers.length > 0 && <CheersBanner cheers={cheers} />}
       <PageTitle>오늘도 복근 챙기기 🔥</PageTitle>
       <Sub>Day {day} 운동이 준비되어 있어요.</Sub>
 
@@ -58,5 +68,20 @@ export default function Home({ records, onStart }) {
 
       <WeeklyReport records={records} />
     </Page>
+  )
+}
+
+// 오늘 받은 응원 — "민준·서연 외 1명이 응원했어요"
+function CheersBanner({ cheers }) {
+  const names = [...new Set(cheers.map((c) => c.from_nickname))]
+  const shown = names.slice(0, 2).join('·')
+  const rest = names.length - 2
+  const allDone = cheers.every((c) => c.kind === 'done')
+  return (
+    <Banner>
+      {allDone ? '👏' : '💪'} <strong>{shown}</strong>
+      {rest > 0 && ` 외 ${rest}명`}님이 오늘 응원을 보냈어요
+      {allDone ? '!' : '. 오늘 운동하러 가볼까요?'}
+    </Banner>
   )
 }

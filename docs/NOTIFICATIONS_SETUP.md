@@ -1,64 +1,61 @@
-# 운동 리마인더 알림 설정 가이드 (약 15분)
+# 알림 설정 가이드 (운동 리마인더 · 응원 알림)
 
-> **📌 현재 상태 (2026-07-16): 여기서 중단하기로 결정**
-> - ✅ 완료: 프론트 코드(토글·동의 모달·sw.js), VAPID 키 생성(`.env`), DB 테이블(`notifications.sql` 실행됨)
-> - ⏸️ 안 함: Vercel 환경 변수 등록, Edge Function 배포(4단계), 크론(5단계)
-> - 결과: **배포 사이트에서는 푸시 UI가 아예 보이지 않음** (`VITE_VAPID_PUBLIC_KEY`가 없으면 자동으로 숨겨지도록 설계됨). 앱 내 저녁 리마인더 배너는 계속 동작.
-> - 나중에 재개하려면: 아래 4~5단계 + Vercel 환경 변수 등록만 하면 됨. **재개 전까지 Vercel에 `VITE_VAPID_PUBLIC_KEY`를 등록하지 말 것** — 등록하면 알림을 켤 수 있는데 실제 발송은 안 되는 반쪽 상태가 됨.
+알림은 세 가지예요.
 
-오늘 운동 기록이 없는 회원에게 알림을 보내는 기능이에요. 두 가지가 있습니다.
+| 알림 | 언제 | 보내는 곳 |
+|---|---|---|
+| 홈 배너 | 저녁 6시 이후 앱을 열었는데 오늘 운동 전 | 앱 (설정 불필요) |
+| 미운동 리마인더 푸시 | 매일 저녁 8시(KST), 오늘 운동 기록이 없는 사람 | `send-reminders` 함수 + 크론 |
+| 응원 푸시 | 그룹 멤버가 👏/💪 응원을 보냈을 때 | `notify-cheer` 함수 |
 
-1. **앱 내 배너** — 저녁 6시 이후 홈 화면에 리마인더 배너 표시. **추가 설정 없이 바로 동작**해요.
-2. **브라우저 푸시** — 앱을 닫아도 매일 저녁 8시(KST)에 알림 도착. 아래 설정이 필요해요.
+푸시는 **로그인한 회원이 설정에서 알림을 켰을 때만** 가요. 아이폰은 iOS 16.4 이상에서 **홈 화면에 추가한 앱**으로 열어야 알림을 켤 수 있어요.
 
----
+## 설정 순서 (처음 한 번, 약 15분)
 
-## 브라우저 푸시 설정
+모든 명령은 프로젝트 폴더의 터미널에서 실행해요. (`npx supabase login` 은 한 번 해 두었으면 생략)
 
-### 1~2. VAPID 키 (✅ 완료됨)
-VAPID 키는 이미 생성되어 `.env`에 들어 있어요:
-- `VITE_VAPID_PUBLIC_KEY` — 클라이언트 구독용 공개키
-- `VAPID_PRIVATE_KEY` — 발송용 비공개키 (VITE_ 접두사가 없어 번들에 포함되지 않음)
+### 1. DB 준비
+SQL Editor 에서 `supabase/v0.8-cheers-and-push.sql` 실행 (응원 테이블·푸시 등록 함수).
 
-`.env`를 바꾼 뒤에는 **dev 서버를 재시작**해야 반영돼요.
-Vercel 배포 시 `VITE_VAPID_PUBLIC_KEY`를 환경 변수에 등록하세요 (비공개키는 Vercel에 올릴 필요 없음).
-
-### 3. DB 테이블 만들기
-Supabase **SQL Editor → New query**에 `supabase/notifications.sql` 내용을 붙여넣고 **Run**.
-(푸시 구독 저장 테이블 + 보안 정책)
-
-### 4. Edge Function 배포
-[Supabase CLI](https://supabase.com/docs/guides/cli) 설치 후:
+### 2. 알림 키(VAPID) 만들기
 ```bash
-supabase login
-supabase link --project-ref <PROJECT_REF>   # Project Settings > General 에서 확인
-supabase secrets set VAPID_PUBLIC_KEY=<.env의 VITE_VAPID_PUBLIC_KEY 값> VAPID_PRIVATE_KEY=<.env의 VAPID_PRIVATE_KEY 값> VAPID_SUBJECT=mailto:본인이메일
-supabase functions deploy send-reminders
+npx web-push generate-vapid-keys
+```
+`Public Key` 와 `Private Key` 가 나와요. **Private Key 는 아래 3번 시크릿에만 넣고, 코드·채팅·깃에 올리지 마세요.**
+
+### 3. 서버 시크릿 등록
+`CRON_SECRET` 은 아무 긴 무작위 문자열이면 돼요. (예: `openssl rand -hex 32` 결과)
+```bash
+npx supabase secrets set --project-ref pqxtzuomckmroqjjkjdq VAPID_PUBLIC_KEY=공개키 VAPID_PRIVATE_KEY=개인키 VAPID_SUBJECT=mailto:내이메일 CRON_SECRET=무작위문자열
 ```
 
-### 5. 매일 자동 실행 (크론)
-1. Dashboard **Database → Extensions**에서 `pg_cron`, `pg_net` 활성화
-2. `supabase/notifications.sql` 하단의 주석 처리된 `cron.schedule(...)` 부분에
-   `<PROJECT_REF>`와 `<SERVICE_ROLE_KEY>`(Project Settings → API Keys)를 채워
-   SQL Editor에서 실행
-3. 기본 스케줄은 `0 11 * * *` (UTC 11:00 = **KST 저녁 8시**). 시간을 바꾸려면 이 값을 수정
+### 4. 함수 배포
+```bash
+npx supabase functions deploy send-reminders --project-ref pqxtzuomckmroqjjkjdq --no-verify-jwt
+```
+```bash
+npx supabase functions deploy notify-cheer --project-ref pqxtzuomckmroqjjkjdq
+```
+(`send-reminders` 는 크론이 부르므로 로그인 토큰 검사를 끄고, 함수 안에서 `CRON_SECRET` 으로 확인해요.)
 
-### 6. 확인
-1. `npm run dev` → **설정 탭 → 운동 리마인더 → 알림 켜기 🔔** (로그인 필요)
-2. 수동 발송 테스트:
-   ```bash
-   curl -X POST https://<PROJECT_REF>.supabase.co/functions/v1/send-reminders \
-     -H "Authorization: Bearer <SERVICE_ROLE_KEY>"
-   ```
-   응답 예: `{"date":"2026-07-15","targets":3,"sent":3,"cleaned":0}`
-   (오늘 운동을 아직 안 했다면 본인에게 알림이 와야 해요)
+### 5. 매일 저녁 자동 발송(크론) 등록
+1. Dashboard → **Database → Extensions** 에서 `pg_cron`, `pg_net` 켜기
+2. SQL Editor 에서 `supabase/notifications-cron.sql` 의 `<CRON_SECRET>` 을 3번 값으로 바꿔 실행
 
-## 동작 방식
-- 회원이 설정에서 알림을 켜면 이 브라우저의 푸시 구독이 `push_subscriptions` 테이블에 저장돼요 (기기별 1개).
-- 매일 KST 20:00에 Edge Function이 **오늘 운동 기록이 없는 구독자**에게만 Web Push를 보내요.
-- 만료·취소된 구독은 발송 시 자동 정리됩니다.
+### 6. 앱에 공개키 연결
+Vercel → Project → Settings → **Environment Variables** 에 `VITE_VAPID_PUBLIC_KEY` = 2번의 Public Key 추가 → **Redeploy**.
+이 값이 있어야 설정 화면에 "알림 (리마인더·응원)" 항목이 나타나요.
 
-## 참고
-- 푸시는 HTTPS(또는 localhost)에서만 동작해요 — Vercel 배포 환경은 OK.
-- iOS Safari는 **홈 화면에 추가(PWA)한 경우에만** 푸시를 지원해요 (iOS 16.4+).
-- 사용자가 브라우저에서 알림 권한을 거부하면 브라우저 설정에서 직접 다시 허용해야 해요.
+## 확인
+- 앱 설정에서 알림 켜기 → 다른 계정으로 같은 그룹에서 응원 보내기 → 알림 도착
+- 리마인더 수동 실행 (크론 기다리지 않고):
+  ```bash
+  curl -X POST https://pqxtzuomckmroqjjkjdq.supabase.co/functions/v1/send-reminders -H "x-cron-secret: 무작위문자열"
+  ```
+  `{"date":..., "targets":N, "sent":N, ...}` 가 나오면 성공
+- 크론 실행 기록: SQL Editor 에서 `select * from cron.job_run_details order by start_time desc limit 5;`
+
+## 문제 해결
+- 설정에 알림 항목이 안 보임 → 6번(Vercel 환경 변수 + 재배포) 확인, 아이폰은 홈 화면 앱으로 열었는지 확인
+- 알림 켜기에서 "알림 등록에 실패" → 1번 SQL 실행 여부 확인
+- 알림이 안 옴 → 3·4번 확인, 브라우저/OS 알림 권한 확인

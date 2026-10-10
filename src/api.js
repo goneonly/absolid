@@ -1,6 +1,6 @@
 // 서버 기록 동기화 — 로그인 상태일 때만 동작, 아니면 조용히 패스
 import { supabase } from './supabase.js'
-import { getRecords, todayKey } from './storage.js'
+import { getRecords, saveRecord, todayKey } from './storage.js'
 import {
   BUCKET, workoutPhotoPath, workoutPhotoDate, avatarPath, groupPhotoPath, inFolder, photoObjectPath,
 } from './storagePaths.js'
@@ -32,15 +32,24 @@ async function signPhotoPaths(paths) {
   }
 }
 
-export async function pushRecord(dateKey, day, completedAt) {
+// ── 운동 완료 (서버 검증) ─────────────────────
+// 영상 재생을 시작하면 시청 세션을 만들고, 완료 시 서버가 경과 시간을 확인해 기록 (v0.7 SQL)
+export async function startWorkoutSession(videoSeconds) {
   const user_id = await uid()
-  if (!user_id) return
-  // supabase-js 는 실패해도 throw 하지 않고 { error } 를 반환 → 직접 던져서 호출부가 안내하게 함
-  const { error } = await supabase.from('workouts').upsert(
-    { user_id, date: dateKey, day, completed_at: completedAt || new Date().toISOString() },
-    { onConflict: 'user_id,date' }
-  )
-  if (error) throw new Error(error.message)
+  if (!user_id) return null
+  const { data, error } = await supabase.rpc('start_workout', { p_video_seconds: Math.round(videoSeconds || 0) })
+  return error ? null : data
+}
+
+// 반환: 기록된 날짜 키 / 실패 시 Error — retryable=true 면 연결 문제(나중에 다시 시도 가능)
+export async function completeWorkout(sessionId) {
+  const { data, error } = await supabase.rpc('complete_workout', { p_session: sessionId })
+  if (error) {
+    const e = new Error(error.message || '운동 기록에 실패했어요.')
+    e.retryable = error.code !== 'P0001' // P0001 = 서버가 판단해 거절한 경우(시청 시간 부족 등)
+    throw e
+  }
+  return data
 }
 
 export async function fetchServerRecords() {
@@ -286,6 +295,44 @@ export async function fetchGroupStatus(groupId) {
   return { members, photos }
 }
 
+// ── 응원 (v0.8 SQL) ──────────────────────────
+// 같은 그룹 멤버에게 하루 한 번 — 반환: 새 응원 id (오늘 이미 응원했으면 null)
+export async function sendCheer(groupId, toUserId) {
+  const { data, error } = await supabase.rpc('send_cheer', { p_group: groupId, p_to: toUserId })
+  if (error) throw new Error(error.code === 'P0001' ? error.message : '응원을 보내지 못했어요. 잠시 후 다시 시도해 주세요.')
+  return data
+}
+
+// 받은 사람 기기로 푸시 알림 (실패해도 응원 자체는 저장돼 있으므로 조용히 무시)
+export async function notifyCheer(cheerId) {
+  try {
+    await supabase.functions.invoke('notify-cheer', { body: { cheerId } })
+  } catch { /* noop */ }
+}
+
+// 오늘 멤버들이 받은 응원 → { counts: {userId: n}, byMe: Set(userId) }
+export async function fetchTodayCheers(memberIds) {
+  const user_id = await uid()
+  const out = { counts: {}, byMe: new Set() }
+  if (!user_id || !memberIds?.length) return out
+  const { data, error } = await supabase
+    .from('cheers').select('from_user, to_user').eq('date', todayKey()).in('to_user', memberIds)
+  if (error) return out
+  for (const c of data || []) {
+    out.counts[c.to_user] = (out.counts[c.to_user] || 0) + 1
+    if (c.from_user === user_id) out.byMe.add(c.to_user)
+  }
+  return out
+}
+
+// 오늘 내가 받은 응원 목록 [{ from_nickname, kind, group_name, created_at }]
+export async function fetchReceivedCheers() {
+  const user_id = await uid()
+  if (!user_id) return []
+  const { data, error } = await supabase.rpc('my_received_cheers')
+  return error ? [] : data || []
+}
+
 // ── 그룹 리더보드 ────────────────────────────
 // 기간 내 멤버별 인증 완료 날짜 집계 (RLS: 같은 그룹 멤버끼리 조회 가능)
 export async function fetchGroupWorkoutDates(memberIds, startKey, endKey) {
@@ -323,18 +370,18 @@ export async function resetServerWorkouts() {
   return !count
 }
 
-// 비회원 시절 로컬 기록을 서버로 올리기 (로그인 직후 1회, 오늘·어제 기록만)
-export async function syncLocalToServer() {
+// 연결 문제로 서버에 못 남긴 완료 기록을 다시 시도 (앱 시작 시) — 성공하면 인증샷도 이어서 업로드
+export async function retryPendingCompletions() {
   const user_id = await uid()
   if (!user_id) return
-  // 서버는 오늘·어제 날짜 기록만 받음 (v0.6-security.sql) — 더 오래된 기록이 섞이면 한 번에 올리는 요청 전체가 거부됨
-  const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1)
-  const minKey = todayKey(yesterday)
-  const rows = Object.entries(getRecords())
-    .filter(([date, v]) => v.completed && date >= minKey)
-    .map(([date, v]) => ({
-      user_id, date, day: v.day || 1,
-      completed_at: v.completedAt || new Date().toISOString(),
-    }))
-  if (rows.length) await supabase.from('workouts').upsert(rows, { onConflict: 'user_id,date' })
+  for (const [date, rec] of Object.entries(getRecords())) {
+    if (!rec?.pendingSession) continue
+    try {
+      const saved = await completeWorkout(rec.pendingSession)
+      saveRecord(date, { pendingSession: null })
+      if (rec.photo) await uploadPhoto(saved || date, rec.photo)
+    } catch (e) {
+      if (!e.retryable) saveRecord(date, { pendingSession: null }) // 서버가 거절(만료 등) → 더 시도하지 않음
+    }
+  }
 }

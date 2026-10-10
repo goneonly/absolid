@@ -4,24 +4,29 @@ import { getProfile, markOnboardingPending, cancelOnboarding } from '../storage.
 import {
   validateEmail, validateName, validatePhone, formatPhone, validatePassword,
 } from '../validation.js'
-import PrivacyModal from '../components/PrivacyModal.jsx'
+import { PrivacyModal, TermsModal, TERMS_VERSION } from '../components/LegalModals.jsx'
 import { Button, Field, FieldError, LinkButton, Logo, Sub } from '../components/ui.jsx'
 
 // 앱 첫 화면 — 로그인 / 회원가입 / 비회원으로 시작
 // 로그인(또는 즉시 세션이 생기는 가입)에 성공하면 onDone → App이 메인 화면으로 전환
+const CHECKBOX = 'size-4 flex-none accent-brand'
+
 export default function Login({ onDone, onGuest }) {
   const [mode, setMode] = useState('signin') // signin | signup
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
-  const [agreed, setAgreed] = useState(false)
+  // 가입 동의 3가지 (모두 필수)
+  const [agreed, setAgreed] = useState({ age: false, terms: false, privacy: false })
   const [fieldErrors, setFieldErrors] = useState({})
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
   const [resetBusy, setResetBusy] = useState(false)
   const [showPrivacy, setShowPrivacy] = useState(false)
+  const [showTerms, setShowTerms] = useState(false)
+  const allAgreed = agreed.age && agreed.terms && agreed.privacy
   const signup = mode === 'signup'
 
   function clearFieldError(key) {
@@ -33,7 +38,7 @@ export default function Login({ onDone, onGuest }) {
     setError('')
     setNotice('')
     setFieldErrors({})
-    setAgreed(false)
+    setAgreed({ age: false, terms: false, privacy: false })
   }
 
   // 필드별 엄격 검증 — 통과 못 하면 제출 자체를 막음
@@ -43,7 +48,7 @@ export default function Login({ onDone, onGuest }) {
       errs.fullName = validateName(fullName)
       errs.phone = validatePhone(phone)
       errs.password = validatePassword(password)
-      errs.agreed = agreed ? '' : '개인정보 수집·이용에 동의해 주세요.'
+      errs.agreed = allAgreed ? '' : '필수 항목에 모두 동의해 주세요.'
     } else {
       errs.password = password ? '' : '비밀번호를 입력해 주세요.'
     }
@@ -67,7 +72,11 @@ export default function Login({ onDone, onGuest }) {
     // 온보딩 플래그는 가입 요청 "전"에 저장해야 함 —
     // 가입 성공 시 세션 발급(App의 팝업 체크)이 응답보다 먼저 일어나기 때문
     markOnboardingPending()
-    const res = await signUp(email.trim(), password, getProfile().nickname, fullName.trim(), formatPhone(phone))
+    const res = await signUp(email.trim(), password, getProfile().nickname, fullName.trim(), formatPhone(phone), {
+      age_over_14: true,
+      terms_version: TERMS_VERSION,
+      terms_agreed_at: new Date().toISOString(),
+    })
     setBusy(false)
     if (res?.error) {
       cancelOnboarding() // 가입 실패 시 롤백
@@ -174,21 +183,44 @@ export default function Login({ onDone, onGuest }) {
         )}
         {signup && (
           <div className="mt-4 rounded-md border border-line bg-surface-2 px-3.5 py-3">
-            <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <label className="flex cursor-pointer items-center gap-2 border-b border-line pb-2.5 text-base font-semibold">
               <input
                 type="checkbox"
-                className="size-4 flex-none accent-brand"
-                checked={agreed}
+                className={CHECKBOX}
+                checked={allAgreed}
                 onChange={(e) => {
-                  setAgreed(e.target.checked)
+                  const on = e.target.checked
+                  setAgreed({ age: on, terms: on, privacy: on })
                   clearFieldError('agreed')
                 }}
               />
-              <span>개인정보 수집 및 이용에 동의합니다. (필수)</span>
+              전체 동의
             </label>
-            <LinkButton type="button" className="mt-1.5 underline" onClick={() => setShowPrivacy(true)}>
-              자세히 보기
-            </LinkButton>
+            {[
+              ['age', '(필수) 만 14세 이상입니다'],
+              ['terms', '(필수) 이용약관 동의', () => setShowTerms(true)],
+              ['privacy', '(필수) 개인정보 수집·이용 및 국외 이전 동의', () => setShowPrivacy(true)],
+            ].map(([key, label, onView]) => (
+              <div key={key} className="mt-2.5 flex items-center gap-2 text-sm">
+                <label className="flex flex-1 cursor-pointer items-center gap-2">
+                  <input
+                    type="checkbox"
+                    className={CHECKBOX}
+                    checked={agreed[key]}
+                    onChange={(e) => {
+                      setAgreed((p) => ({ ...p, [key]: e.target.checked }))
+                      clearFieldError('agreed')
+                    }}
+                  />
+                  {label}
+                </label>
+                {onView && (
+                  <LinkButton type="button" className="flex-none underline" onClick={onView}>
+                    보기
+                  </LinkButton>
+                )}
+              </div>
+            ))}
             {fieldErrors.agreed && <FieldError>{fieldErrors.agreed}</FieldError>}
           </div>
         )}
@@ -210,6 +242,7 @@ export default function Login({ onDone, onGuest }) {
       </LinkButton>
 
       {showPrivacy && <PrivacyModal onClose={() => setShowPrivacy(false)} />}
+      {showTerms && <TermsModal onClose={() => setShowTerms(false)} />}
     </main>
   )
 }
