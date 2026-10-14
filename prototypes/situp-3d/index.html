@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sit-up 3D 테스트</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #141519; color: #f2f3f5; overflow: hidden;
+      font-family: 'Pretendard Variable', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
+    canvas { display: block; }
+    .hud { position: fixed; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; gap: 8px; pointer-events: none; }
+    .panel { background: rgba(30, 32, 38, .86); border: 1px solid #2e3138; border-radius: 12px; padding: 10px 12px; font-size: 12px; line-height: 1.5; color: #9a9ea8; }
+    .panel b { color: #f2f3f5; font-size: 14px; }
+    .panel .big { color: #ff3b30; font-weight: 800; font-size: 20px; }
+    .controls { position: fixed; left: 12px; right: 12px; bottom: 16px; display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; }
+    button { font: inherit; font-size: 13px; font-weight: 600; color: #f2f3f5; background: #26282f; border: 1px solid #2e3138; border-radius: 999px; padding: 8px 14px; cursor: pointer; }
+    button.on { background: rgba(255, 59, 48, .15); color: #ff3b30; border-color: rgba(255, 59, 48, .4); }
+    #loading { position: fixed; inset: 0; display: grid; place-items: center; font-size: 14px; color: #9a9ea8; }
+  </style>
+  <script type="importmap">
+    { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    } }
+  </script>
+</head>
+<body>
+  <div id="loading">모델 생성 중…</div>
+  <div class="hud">
+    <div class="panel"><b>Sit-up · 1회 2초</b><br /><span id="phase">-</span></div>
+    <div class="panel" style="text-align:right">반복 <span class="big" id="reps">0</span><br /><span id="tris"></span></div>
+  </div>
+  <div class="controls">
+    <button id="play">일시정지</button>
+    <button id="slow">0.5배속</button>
+    <button id="close">복근 클로즈업</button>
+    <button id="wire">와이어프레임</button>
+  </div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ───────────────────────── 기본 장면 ─────────────────────────
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x141519);
+scene.fog = new THREE.Fog(0x141519, 4, 10);
+
+const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.05, 30);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.minDistance = 0.4;
+controls.maxDistance = 5;
+const VIEWS = {
+  wide: { pos: [2.0, 1.0, 0.05], target: [0, 0.3, -0.22] },
+  close: { pos: [0.62, 0.62, 0.42], target: [0, 0.3, -0.2] },
+};
+function setView(name) {
+  const v = VIEWS[name];
+  camera.position.set(...v.pos);
+  controls.target.set(...v.target);
+  controls.update();
+}
+setView('wide');
+
+// 조명: 복근 굴곡이 잘 보이도록 위·옆에서 비스듬히 비추는 키 라이트 + 붉은 림 라이트
+scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x2a2420, 0.5));
+const key = new THREE.DirectionalLight(0xfff1e6, 2.8);
+key.position.set(1.4, 2.0, 1.6);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+key.shadow.camera.left = -1.2; key.shadow.camera.right = 1.2;
+key.shadow.camera.top = 1.2; key.shadow.camera.bottom = -1.2;
+key.shadow.bias = -0.0004;
+key.shadow.normalBias = 0.02;
+scene.add(key);
+const rim = new THREE.DirectionalLight(0xff8a70, 1.4);
+rim.position.set(-2, 1.2, -1.6);
+scene.add(rim);
+const fill = new THREE.DirectionalLight(0x9db4ff, 0.35);
+fill.position.set(-1, 0.6, 2);
+scene.add(fill);
+
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.MeshStandardMaterial({ color: 0x1b1c21, roughness: 0.95 }));
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+const MAT_H = 0.012;
+const mat = new THREE.Mesh(new THREE.BoxGeometry(0.66, MAT_H, 1.9), new THREE.MeshStandardMaterial({ color: 0xb8322a, roughness: 0.75 }));
+mat.position.set(0, MAT_H / 2, 0.12);
+mat.receiveShadow = true;
+scene.add(mat);
+
+// ───────────────────────── 재질 ─────────────────────────
+const skin = new THREE.MeshPhysicalMaterial({
+  color: 0xc58a68, roughness: 0.5, metalness: 0,
+  sheen: 0.35, sheenRoughness: 0.6, sheenColor: new THREE.Color(0xffd6c0),
+  clearcoat: 0.08, clearcoatRoughness: 0.6,
+});
+const cloth = new THREE.MeshStandardMaterial({ color: 0x24262d, roughness: 0.85 });
+const shoe = new THREE.MeshStandardMaterial({ color: 0x30333b, roughness: 0.6 });
+const hair = new THREE.MeshStandardMaterial({ color: 0x1c1915, roughness: 0.95 });
+const ALL_MATS = [skin, cloth, shoe, hair];
+
+// ───────────────────────── 유틸 ─────────────────────────
+const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const gauss = (d, s) => Math.exp(-(d * d) / (2 * s * s));
+// 둥근 사각형 돔 (근육 덩어리 하나) — 0..1
+function blob(x, y, cx, cy, hx, hy, p = 4) {
+  const q = Math.abs((x - cx) / hx) ** p + Math.abs((y - cy) / hy) ** p;
+  if (q >= 1) return 0;
+  return (1 - smooth(0.3, 1, q)) * (1 - 0.3 * q);
+}
+// 부드러운 근육 돔 — 가장자리가 피부로 자연스럽게 이어짐 (복근·가슴용)
+function soft(x, y, cx, cy, hx, hy, p = 2.6) {
+  const q = Math.abs((x - cx) / hx) ** p + Math.abs((y - cy) / hy) ** p;
+  return q >= 1 ? 0 : (1 - q) ** 1.35;
+}
+// 점과 선분 사이 거리 (V라인 홈)
+function segDist(x, y, ax, ay, bx, by) {
+  const vx = bx - ax, vy = by - ay;
+  const t = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / (vx * vx + vy * vy)));
+  return Math.hypot(x - ax - vx * t, y - ay - vy * t);
+}
+// Catmull-Rom 보간 (몸통 단면 크기 곡선)
+function curve(keys, y) {
+  if (y <= keys[0][0]) return keys[0][1];
+  for (let i = 0; i < keys.length - 1; i++) {
+    const [y1, v1] = keys[i], [y2, v2] = keys[i + 1];
+    if (y <= y2) {
+      const v0 = keys[Math.max(0, i - 1)][1], v3 = keys[Math.min(keys.length - 1, i + 2)][1];
+      const t = (y - y1) / (y2 - y1), t2 = t * t, t3 = t2 * t;
+      return 0.5 * ((2 * v1) + (-v0 + v2) * t + (2 * v0 - 5 * v1 + 4 * v2 - v3) * t2 + (-v0 + 3 * v1 - 3 * v2 + v3) * t3);
+    }
+  }
+  return keys[keys.length - 1][1];
+}
+
+// ───────────────────────── 몸통 (고해상도 + 복근 조각) ─────────────────────────
+// 서 있는 자세 기준 좌표: y = 위(골반 0 → 어깨 0.55m), z = 앞(배), x = 좌우
+const W_KEYS = [[-0.06, 0.166], [0.0, 0.17], [0.08, 0.158], [0.18, 0.146], [0.28, 0.153], [0.36, 0.168], [0.44, 0.183], [0.51, 0.192], [0.56, 0.15], [0.61, 0.065]];
+const D_KEYS = [[-0.06, 0.104], [0.0, 0.107], [0.08, 0.1], [0.18, 0.097], [0.28, 0.107], [0.36, 0.118], [0.44, 0.124], [0.51, 0.116], [0.56, 0.09], [0.61, 0.058]];
+const Y0 = -0.06, Y1 = 0.61;
+
+// 앞면 근육 높이(m) — flex = 0(이완) / 1(수축: 복근이 더 도드라짐)
+function muscles(x, y, flex) {
+  const k = 1 + 0.6 * flex;          // 수축 시 근육 볼륨
+  const g = 1 + 0.5 * flex;          // 수축 시 홈 깊이
+  let m = 0;
+  // 복직근 바탕 (근막)
+  m += 0.004 * blob(x, y, 0, 0.19, 0.08, 0.2, 2.5);
+  // 복근 블록: 위 3단(좌우 6팩) + 배꼽 아래 1단 — 좌우를 살짝 엇갈리게 (실제 복근처럼)
+  for (const side of [-1, 1]) {
+    const off = side > 0 ? 0.004 : 0;
+    const cx = 0.036 * side;
+    m += 0.0080 * k * soft(x, y, cx, 0.305 + off, 0.034, 0.037);
+    m += 0.0088 * k * soft(x, y, cx, 0.238 + off, 0.035, 0.035);
+    m += 0.0088 * k * soft(x, y, cx, 0.172 + off, 0.035, 0.035);
+    const taper = y < 0.075 ? 1 - 0.4 * (0.075 - y) / 0.06 : 1; // 아래로 갈수록 좁아짐
+    m += 0.0065 * k * soft(x, y, cx * 0.92, 0.078, 0.031 * taper, 0.06, 2.4);
+    // 가로 힘줄 홈 (블록 사이를 가늘고 선명하게)
+    const inAbs = 1 - smooth(0.05, 0.075, Math.abs(x));
+    for (const gy of [0.2715, 0.205, 0.138]) m -= 0.0022 * g * gauss(y - gy - off, 0.0035) * inAbs;
+    // 외복사근 (옆구리 사선 근육)
+    const ox = x - 0.118 * side, oy = y - 0.17;
+    const a = 0.6 * side; // 사선 방향
+    const rx = ox * Math.cos(a) + oy * Math.sin(a), ry = -ox * Math.sin(a) + oy * Math.cos(a);
+    m += 0.008 * k * soft(rx, ry, 0, 0, 0.034, 0.09, 2.2);
+    // 전거근 (갈비뼈 옆 톱니 모양)
+    for (let i = 0; i < 4; i++) {
+      m += 0.0022 * k * soft(x, y, (0.13 + 0.006 * (i % 2)) * side, 0.3 + 0.034 * i, 0.022, 0.014, 2.2);
+    }
+    // 대흉근
+    m += 0.02 * soft(x, y, 0.084 * side, 0.43, 0.092, 0.066, 2.4);
+    // V라인 (장골 쪽 홈 + 위쪽 융기)
+    const d = segDist(x, y, 0.112 * side, 0.115, 0.036 * side, 0.0);
+    m += -0.0045 * g * gauss(d, 0.0055) + 0.0028 * gauss(d - 0.012, 0.007);
+  }
+  // 백선 (복근 가운데 세로 홈)
+  m -= 0.0026 * g * gauss(x, 0.0042) * smooth(0.0, 0.03, y) * (1 - smooth(0.34, 0.37, y));
+  // 가슴 가운데 홈
+  m -= 0.004 * gauss(x, 0.01) * smooth(0.37, 0.4, y) * (1 - smooth(0.47, 0.5, y));
+  // 배꼽 (움푹 + 테두리)
+  const nr = Math.hypot(x, (y - 0.124) * 0.85);
+  m += -0.0095 * gauss(nr, 0.0062) + 0.0018 * gauss(nr - 0.011, 0.003);
+  return m;
+}
+
+function buildTorso() {
+  const U = 288, V = 240, N = 2.4; // 단면 둘레 288 × 높이 240 분할
+  const cols = U + 1, rows = V + 1;
+  const base = new Float32Array(cols * rows * 3), flexed = new Float32Array(cols * rows * 3);
+  const ys = new Float32Array(cols * rows);
+  for (let j = 0; j < rows; j++) {
+    const y = Y0 + (Y1 - Y0) * (j / V);
+    const w = curve(W_KEYS, y), dd = curve(D_KEYS, y);
+    for (let i = 0; i < cols; i++) {
+      const u = -Math.PI / 2 + (i / U) * Math.PI * 2; // 이음새는 등 가운데
+      const c = Math.cos(u), s = Math.sin(u);
+      const x = w * Math.sign(c) * Math.abs(c) ** (2 / N);
+      let z = dd * Math.sign(s) * Math.abs(s) ** (2 / N);
+      if (s < 0) z *= 0.93; // 등은 조금 더 평평
+      // 단면 바깥 방향
+      let nx = x / (w * w), nz = z / (dd * dd);
+      const nl = Math.hypot(nx, nz) || 1; nx /= nl; nz /= nl;
+      const front = smooth(-0.15, 0.55, s); // 앞·옆면에만 근육 조각
+      const idx = (j * cols + i) * 3;
+      const m0 = muscles(x, y, 0) * front, m1 = muscles(x, y, 1) * front;
+      base[idx] = x + nx * m0; base[idx + 1] = y; base[idx + 2] = z + nz * m0;
+      flexed[idx] = x + nx * m1; flexed[idx + 1] = y; flexed[idx + 2] = z + nz * m1;
+      ys[j * cols + i] = y;
+    }
+  }
+  const index = [];
+  for (let j = 0; j < V; j++) for (let i = 0; i < U; i++) {
+    const a = j * cols + i, b = a + 1, c = a + cols, d = c + 1;
+    index.push(a, c, b, b, c, d);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setIndex(index);
+  geo.setAttribute('position', new THREE.BufferAttribute(base, 3));
+  geo.computeVertexNormals();
+  const flexGeo = geo.clone();
+  flexGeo.setAttribute('position', new THREE.BufferAttribute(flexed, 3));
+  flexGeo.computeVertexNormals();
+  // 등 이음새 노멀 평균 (이음새 자국 제거)
+  for (const g of [geo, flexGeo]) {
+    const n = g.attributes.normal;
+    for (let j = 0; j < rows; j++) {
+      const a = j * cols, b = a + U;
+      const v = new THREE.Vector3(n.getX(a) + n.getX(b), n.getY(a) + n.getY(b), n.getZ(a) + n.getZ(b)).normalize();
+      n.setXYZ(a, v.x, v.y, v.z); n.setXYZ(b, v.x, v.y, v.z);
+    }
+  }
+  // 복근 수축 = 모프 타깃 (이완 → 수축 차이)
+  const dPos = new Float32Array(flexed.length), dNor = new Float32Array(flexed.length);
+  const n0 = geo.attributes.normal.array, n1 = flexGeo.attributes.normal.array;
+  for (let k = 0; k < flexed.length; k++) { dPos[k] = flexed[k] - base[k]; dNor[k] = n1[k] - n0[k]; }
+  geo.morphAttributes.position = [new THREE.BufferAttribute(dPos, 3)];
+  geo.morphAttributes.normal = [new THREE.BufferAttribute(dNor, 3)];
+  geo.morphTargetsRelative = true;
+  return { geo, ys };
+}
+
+// ───────────────────────── 척추 뼈대 ─────────────────────────
+// 골반(고정) → 요추 → 흉추 아래 → 흉추 위 → 가슴 → 목 : 둥글게 말리며 올라오도록 나눠서 굽힘
+const BONE_Y = [0, 0.06, 0.2, 0.34, 0.47, 0.57];
+const FLEX = [0, 0.5, 0.38, 0.26, 0.1, 0.2]; // 최고 지점 굽힘(rad) — 합계 약 71° + 턱 당김
+const bones = BONE_Y.map((y, i) => {
+  const b = new THREE.Bone();
+  b.position.y = i === 0 ? 0 : y - BONE_Y[i - 1];
+  return b;
+});
+for (let i = 1; i < bones.length; i++) bones[i - 1].add(bones[i]);
+
+function skinWeights(ys) {
+  const n = ys.length, si = new Uint16Array(n * 4), sw = new Float32Array(n * 4);
+  for (let v = 0; v < n; v++) {
+    const y = ys[v];
+    let i = 0;
+    while (i < BONE_Y.length - 2 && y > BONE_Y[i + 1]) i++;
+    const t = smooth(BONE_Y[i], BONE_Y[i + 1], y);
+    si[v * 4] = i; si[v * 4 + 1] = i + 1;
+    sw[v * 4] = 1 - t; sw[v * 4 + 1] = t;
+  }
+  return { si, sw };
+}
+
+// ───────────────────────── 몸 조립 ─────────────────────────
+const body = new THREE.Group();
+body.rotation.x = -Math.PI / 2;              // 누운 자세: 배(z+)가 위, 머리(y+)가 -z 방향
+body.position.set(0, MAT_H + 0.118, 0);
+scene.add(body);
+
+const { geo: torsoGeo, ys } = buildTorso();
+const { si, sw } = skinWeights(ys);
+torsoGeo.setAttribute('skinIndex', new THREE.BufferAttribute(si, 4));
+torsoGeo.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4));
+const torso = new THREE.SkinnedMesh(torsoGeo, skin);
+torso.castShadow = torso.receiveShadow = true;
+torso.frustumCulled = false; // 뼈대로 움직여 범위가 바뀌므로 화면 밖 판정 끄기
+torso.add(bones[0]);
+torso.bind(new THREE.Skeleton(bones));
+torso.morphTargetInfluences = [0];
+body.add(torso);
+
+// 두 점 사이를 잇는 근육형 팔다리 (끝이 둥근 테이퍼 원통 + 가운데 볼록)
+function limb(a, b, r1, r2, material, bulge = 0) {
+  const len = a.distanceTo(b);
+  const pts = [];
+  const steps = 40;
+  for (let k = 0; k <= 10; k++) { const t = (k / 10) * Math.PI / 2; pts.push(new THREE.Vector2(Math.sin(t) * r1, -Math.cos(t) * r1)); }
+  for (let k = 1; k < steps; k++) {
+    const t = k / steps;
+    const r = r1 + (r2 - r1) * t + bulge * Math.sin(Math.PI * Math.min(1, t * 1.15)) ** 1.5;
+    pts.push(new THREE.Vector2(r, len * t));
+  }
+  for (let k = 0; k <= 10; k++) { const t = (k / 10) * Math.PI / 2; pts.push(new THREE.Vector2(Math.cos(t) * r2, len + Math.sin(t) * r2)); }
+  const m = new THREE.Mesh(new THREE.LatheGeometry(pts, 72), material);
+  m.position.copy(a);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
+  m.castShadow = m.receiveShadow = true;
+  body.add(m);
+  return m;
+}
+function ellipsoid(pos, sx, sy, sz, material, seg = 64) {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(1, seg, seg / 2), material);
+  m.position.copy(pos); m.scale.set(sx, sy, sz);
+  m.castShadow = m.receiveShadow = true;
+  body.add(m);
+  return m;
+}
+const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+
+// 반바지 (골반 고정)
+const shorts = new THREE.Mesh(new THREE.CylinderGeometry(0.182, 0.178, 0.17, 96, 1, true), cloth);
+shorts.scale.set(1, 1, 0.66); shorts.position.y = -0.04;
+shorts.castShadow = true; body.add(shorts);
+const band = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.007, 12, 96), cloth);
+band.rotation.x = Math.PI / 2; band.scale.set(1, 0.66, 1); band.position.y = 0.045; body.add(band);
+
+const rigid = { 0: [], 4: [], 5: [] }; // 뼈대에 붙일 단단한 부위
+for (const s of [-1, 1]) {
+  // 다리: 무릎 세운 자세 (고정)
+  const hip = V3(0.095 * s, -0.03, 0.0), knee = V3(0.118 * s, -0.255, 0.39);
+  const ankle = V3(0.112 * s, -0.3, -0.035), toe = V3(0.12 * s, -0.5, -0.088);
+  limb(hip, knee, 0.088, 0.058, skin, 0.016);           // 허벅지 (대퇴사두근)
+  limb(hip, hip.clone().lerp(knee, 0.42), 0.097, 0.088, cloth); // 반바지 다리
+  ellipsoid(knee, 0.052, 0.05, 0.05, skin);             // 무릎
+  limb(knee, ankle, 0.054, 0.038, skin, 0.014);         // 정강이·종아리
+  const f = limb(ankle.clone().add(V3(0, 0.03, -0.02)), toe, 0.045, 0.036, shoe); // 운동화
+  f.scale.set(1.15, 1, 0.75);
+  // 어깨 (가슴 뼈에 붙음)
+  rigid[4].push(ellipsoid(V3(0.198 * s, 0.505, 0.0), 0.068, 0.062, 0.07, skin));
+  // 팔: 손을 머리 뒤로 깍지 (가슴 뼈에 붙음)
+  const sh = V3(0.2 * s, 0.505, 0.0), el = V3(0.355 * s, 0.725, 0.03), hand = V3(0.065 * s, 0.75, -0.085);
+  rigid[4].push(limb(sh, el, 0.052, 0.04, skin, 0.012));  // 위팔 (이두·삼두)
+  rigid[4].push(limb(el, hand, 0.04, 0.03, skin, 0.01));  // 아래팔
+  rigid[4].push(ellipsoid(hand, 0.035, 0.05, 0.025, skin, 32));
+}
+// 목·머리 (목 뼈에 붙음)
+rigid[5].push(limb(V3(0, 0.53, -0.005), V3(0, 0.655, 0.012), 0.056, 0.05, skin));
+rigid[5].push(ellipsoid(V3(0, 0.735, 0.012), 0.094, 0.118, 0.106, skin, 96));
+rigid[5].push(ellipsoid(V3(0, 0.765, -0.004), 0.1, 0.098, 0.106, hair, 96)); // 머리카락
+for (const s of [-1, 1]) rigid[5].push(ellipsoid(V3(0.094 * s, 0.73, 0.0), 0.012, 0.025, 0.018, skin, 24)); // 귀
+
+// 쉰 자세 기준으로 만든 부위를 해당 뼈에 부착 (월드 위치 유지)
+scene.updateMatrixWorld(true);
+for (const [bi, parts] of Object.entries(rigid)) for (const p of parts) bones[bi].attach(p);
+
+// 폴리곤 수
+let tris = 0;
+body.traverse((o) => { if (o.isMesh) tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; });
+document.getElementById('tris').textContent = `폴리곤 ${Math.round(tris).toLocaleString()}개`;
+document.getElementById('loading').remove();
+
+// ───────────────────────── 애니메이션 (1회 2초) ─────────────────────────
+const PERIOD = 2.0;
+let t = 0, speed = 1, playing = true, last = performance.now();
+const phaseEl = document.getElementById('phase'), repsEl = document.getElementById('reps');
+
+function pose(c) {
+  for (let i = 0; i < bones.length; i++) bones[i].rotation.x = FLEX[i] * c;
+  // 올라갈수록 복근 수축 (누워 있을 때도 약간 긴장)
+  torso.morphTargetInfluences[0] = 0.25 + 0.75 * Math.min(1, c * 1.15);
+}
+
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  if (playing) t += dt * speed;
+  const p = (t % PERIOD) / PERIOD;                 // 0 → 1 (한 번)
+  const c = 0.5 - 0.5 * Math.cos(p * Math.PI * 2); // 0(누움) → 1(일어남) → 0
+  pose(c);
+  phaseEl.textContent = p < 0.5 ? '⬆ 올라가기 (복근 수축)' : '⬇ 내려가기 (천천히 버티기)';
+  repsEl.textContent = Math.floor(t / PERIOD);
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ───────────────────────── 버튼 ─────────────────────────
+const $ = (id) => document.getElementById(id);
+$('play').onclick = (e) => { playing = !playing; e.target.textContent = playing ? '일시정지' : '재생'; };
+$('slow').onclick = (e) => { speed = speed === 1 ? 0.5 : 1; e.target.classList.toggle('on', speed !== 1); };
+$('close').onclick = (e) => { const on = !e.target.classList.contains('on'); e.target.classList.toggle('on', on); setView(on ? 'close' : 'wide'); };
+$('wire').onclick = (e) => { const on = !e.target.classList.contains('on'); e.target.classList.toggle('on', on); ALL_MATS.forEach((m) => { m.wireframe = on; }); };
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

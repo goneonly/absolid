@@ -29,7 +29,11 @@ npm run dev
 |---|---|
 | `npm run dev` | 개발 서버 |
 | `npm run build` | 배포용 빌드 |
-| `npm run lint` | ESLint 검사 (CI에서 빌드와 함께 실행) |
+| `npm run lint` | ESLint 검사 |
+| `npm test` | 단위 테스트 (Vitest — 날짜·연속 기록·입력 검사·오류 메시지·기록 재시도 등, 한국 시간 기준) |
+| `npm run test:db` | DB 보안 테스트 (`supabase/*.sql` 을 임시 Postgres 에 적용하고 권한·공격 시나리오 검증, PostgreSQL 설치 필요) |
+
+GitHub에 올리면 CI가 lint·단위 테스트·빌드·DB 보안 테스트를 모두 실행해요. SQL 파일을 새로 만들면 `supabase/tests/run.sh` 의 실행 순서 목록에도 추가하세요.
 
 서버 설정은 문서를 참고하세요.
 
@@ -47,9 +51,11 @@ src/
 ├── admin.js        # 관리자 기능
 ├── storage.js      # 기기 저장소(localStorage) — 키는 이 파일에서만 관리
 ├── storagePaths.js # Storage 버킷·파일 경로 규칙
+├── stats.js        # 리더보드 순위·주간 리포트 계산
 └── index.css       # 디자인 토큰 (색상·폰트 크기·라운드)
 supabase/
 ├── *.sql           # DB 스키마·보안 정책 (실행 순서는 Supabase 설정 문서)
+├── tests/          # DB 보안 테스트 (npm run test:db)
 └── functions/      # delete-account(탈퇴), send-reminders(리마인더), notify-cheer(응원 알림)
 ```
 

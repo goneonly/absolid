@@ -1,7 +1,7 @@
 // 회원 탈퇴 — Supabase Edge Function
 // 로그인한 본인이 호출하면 계정과 모든 데이터를 삭제합니다.
 // 배포: supabase functions deploy delete-account
-// (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY 는 Supabase 가 자동 주입)
+// (SUPABASE_URL 과 키들은 Supabase 가 자동 주입 — 키 선택은 _shared/keys.ts)
 //
 // 동작:
 //   1) 호출자의 JWT 로 본인 user_id 확인 (남의 계정 삭제 불가)
@@ -10,6 +10,7 @@
 //      - Storage 의 본인 인증샷/프로필 사진 삭제
 //      - auth.users 삭제 → profiles/workouts/group_members/push_subscriptions/reports 자동 cascade
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { serviceKey as getServiceKey, publishableKey } from '../_shared/keys.ts'
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -21,11 +22,11 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
 
   const url = Deno.env.get('SUPABASE_URL')!
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  const serviceKey = getServiceKey()
 
   // 1) 호출자 인증 — Authorization 헤더의 JWT 로 본인만 확인
   const authHeader = req.headers.get('Authorization') || ''
-  const asUser = createClient(url, Deno.env.get('SUPABASE_ANON_KEY')!, {
+  const asUser = createClient(url, publishableKey(), {
     global: { headers: { Authorization: authHeader } },
   })
   const { data: { user }, error: uErr } = await asUser.auth.getUser()

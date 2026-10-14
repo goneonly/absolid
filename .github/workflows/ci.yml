@@ -16,4 +16,28 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
+      - run: npm test
       - run: npm run build
+
+  # DB 보안 테스트 — supabase/*.sql 을 실제 Postgres 에 적용하고 권한·공격 시나리오 검증
+  db:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash supabase/tests/run.sh

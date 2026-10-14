@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { todayKey } from '../storage.js'
 import { fetchGroupWorkoutDates } from '../api.js'
+import { daysInRange, getPrevRange, getRange, rankRows, withRankDelta } from '../stats.js'
 import { Card, CardTitle, Input, MemberAvatar, Sub, cx } from './ui.jsx'
 
 const PERIODS = [
@@ -11,68 +12,6 @@ const PERIODS = [
 ]
 
 const MEDALS = ['🥇', '🥈', '🥉']
-
-function parseKey(key) {
-  const [y, m, d] = key.split('-').map(Number)
-  return new Date(y, m - 1, d)
-}
-
-// 기간 → [시작키, 끝키]
-function getRange(period, cs, ce) {
-  const today = new Date()
-  const end = todayKey(today)
-  const s = new Date(today)
-  if (period === 'week') {
-    const day = s.getDay() === 0 ? 6 : s.getDay() - 1 // 월요일 시작
-    s.setDate(s.getDate() - day)
-  } else if (period === 'month') {
-    s.setDate(1)
-  } else if (period === '30d') {
-    s.setDate(s.getDate() - 29)
-  } else if (period === 'custom') {
-    const defStart = new Date(today); defStart.setDate(defStart.getDate() - 6)
-    let a = cs || todayKey(defStart)
-    let b = ce || end
-    if (a > b) [a, b] = [b, a]
-    return [a, b]
-  }
-  return [todayKey(s), end]
-}
-
-// 직전 동일 길이 기간 (순위 변동 비교용)
-function getPrevRange(startKey, endKey) {
-  const s = parseKey(startKey)
-  const e = parseKey(endKey)
-  const days = Math.round((e - s) / 86400000) + 1
-  const pe = new Date(s); pe.setDate(pe.getDate() - 1)
-  const ps = new Date(pe); ps.setDate(ps.getDate() - (days - 1))
-  return [todayKey(ps), todayKey(pe)]
-}
-
-function daysInRange(startKey, endKey) {
-  return Math.round((parseKey(endKey) - parseKey(startKey)) / 86400000) + 1
-}
-
-// 인증 횟수 → 순위 (동점은 같은 순위)
-function rankRows(members, dateSets, myId, records, startKey, endKey) {
-  const rows = members.map(m => {
-    const set = new Set(dateSets[m.id] || [])
-    // 내 기록은 로컬 기록으로 보충 (서버 동기화 지연 대비)
-    if (m.id === myId && records) {
-      for (const [k, v] of Object.entries(records)) {
-        if (v?.completed && k >= startKey && k <= endKey) set.add(k)
-      }
-    }
-    return { ...m, count: set.size }
-  })
-  rows.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
-  let rank = 0; let prevCount = null
-  rows.forEach((r, i) => {
-    if (r.count !== prevCount) { rank = i + 1; prevCount = r.count }
-    r.rank = rank
-  })
-  return rows
-}
 
 export default function Leaderboard({ members, myId, myName, records }) {
   const [period, setPeriod] = useState('week')
@@ -106,10 +45,10 @@ export default function Leaderboard({ members, myId, myName, records }) {
 
   const rows = useMemo(() => {
     if (!cur) return null
-    const current = rankRows(members, cur, myId, records, startKey, endKey)
-    const before = rankRows(members, prev || {}, myId, records, pStartKey, pEndKey)
-    const prevRank = Object.fromEntries(before.map(r => [r.id, r.rank]))
-    return current.map(r => ({ ...r, delta: (prevRank[r.id] ?? r.rank) - r.rank }))
+    return withRankDelta(
+      rankRows(members, cur, myId, records, startKey, endKey),
+      rankRows(members, prev || {}, myId, records, pStartKey, pEndKey),
+    )
   }, [cur, prev, members, myId, records, startKey, endKey, pStartKey, pEndKey])
 
   const totalDays = daysInRange(startKey, endKey)

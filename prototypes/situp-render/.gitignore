@@ -1,0 +1,8 @@
+# 원본 에셋(라이선스상 재배포 불가)·작업 파일은 올리지 않음
+*.fbx
+*.blend
+*.blend1
+frames/
+out/*.png
+__pycache__/
+work/

@@ -4,16 +4,15 @@
 // 호출 인증: x-cron-secret 헤더 = CRON_SECRET 시크릿 (또는 service role 키) — 그 외 호출은 거부
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { sendPushToUsers, todayKST } from '../_shared/webpush.ts'
+import { serviceKey, isServiceKey } from '../_shared/keys.ts'
 
 Deno.serve(async (req) => {
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const cronSecret = Deno.env.get('CRON_SECRET')
-  const authorized =
-    (cronSecret && req.headers.get('x-cron-secret') === cronSecret) ||
-    req.headers.get('Authorization') === `Bearer ${serviceKey}`
+  const bearer = (req.headers.get('Authorization') || '').replace(/^Bearer /, '')
+  const authorized = (cronSecret && req.headers.get('x-cron-secret') === cronSecret) || (bearer && isServiceKey(bearer))
   if (!authorized) return new Response('Unauthorized', { status: 401 })
 
-  const admin = createClient(Deno.env.get('SUPABASE_URL')!, serviceKey)
+  const admin = createClient(Deno.env.get('SUPABASE_URL')!, serviceKey())
   const today = todayKST()
 
   // 구독자 중 오늘 운동 기록이 없는 사람

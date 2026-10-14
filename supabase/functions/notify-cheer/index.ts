@@ -4,6 +4,7 @@
 // 보안: 호출자 JWT 로 본인 확인 → 본인이 보낸, 아직 알림 안 보낸, 10분 이내 응원만 발송 (중복·스팸 방지)
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { sendPushToUsers } from '../_shared/webpush.ts'
+import { serviceKey, publishableKey } from '../_shared/keys.ts'
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -17,7 +18,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
 
   const url = Deno.env.get('SUPABASE_URL')!
-  const asUser = createClient(url, Deno.env.get('SUPABASE_ANON_KEY')!, {
+  const asUser = createClient(url, publishableKey(), {
     global: { headers: { Authorization: req.headers.get('Authorization') || '' } },
   })
   const { data: { user } } = await asUser.auth.getUser()
@@ -26,7 +27,7 @@ Deno.serve(async (req) => {
   const { cheerId } = await req.json().catch(() => ({}))
   if (!cheerId) return json({ error: 'cheerId 가 필요해요.' }, 400)
 
-  const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+  const admin = createClient(url, serviceKey())
   // 알림 발송 권한 확보: 내가 보낸 응원 + 아직 미발송 + 10분 이내 → notified_at 기록 (한 번만 성공)
   const since = new Date(Date.now() - 10 * 60 * 1000).toISOString()
   const { data: cheer, error } = await admin

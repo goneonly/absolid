@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>고해상도 바디 테스트</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #8f8f8f; color: #f2f3f5;
+      font-family: 'Pretendard Variable', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
+    canvas { display: block; }
+    .hud { position: fixed; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; gap: 8px; pointer-events: none; }
+    .panel { background: rgba(20, 21, 25, .78); border: 1px solid rgba(255, 255, 255, .08); border-radius: 12px; padding: 10px 12px; font-size: 12px; line-height: 1.5; color: #b9bdc6; }
+    .panel b { color: #f2f3f5; font-size: 14px; }
+    .panel .big { color: #ff3b30; font-weight: 800; font-size: 20px; }
+    .controls { position: fixed; left: 12px; right: 12px; bottom: 16px; display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; }
+    button { font: inherit; font-size: 13px; font-weight: 600; color: #f2f3f5; background: rgba(20, 21, 25, .82); border: 1px solid rgba(255, 255, 255, .1); border-radius: 999px; padding: 8px 14px; cursor: pointer; }
+    button.on { background: rgba(255, 59, 48, .9); border-color: #ff3b30; }
+    #loading { position: fixed; inset: 0; display: grid; place-items: center; font-size: 14px; color: #2b2d33; }
+  </style>
+  <script type="importmap">
+    { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    } }
+  </script>
+</head>
+<body>
+  <div id="loading">고해상도 모델 불러오는 중… <span id="pct"></span></div>
+  <div class="hud">
+    <div class="panel"><b id="title">A-포즈</b><br /><span id="phase">레퍼런스 비교용 기본 자세</span></div>
+    <div class="panel" style="text-align:right"><span id="repsBox" hidden>반복 <span class="big" id="reps">0</span><br /></span><span id="tris"></span></div>
+  </div>
+  <div class="controls">
+    <button id="mode">윗몸일으키기 보기</button>
+    <button id="flex">복근 힘주기</button>
+    <button id="close">복근 클로즈업</button>
+    <button id="mat">피부색</button>
+    <button id="wire">와이어프레임</button>
+    <button id="play">일시정지</button>
+  </div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+// ───────────── 장면 ─────────────
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.95;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const STUDIO_BG = new THREE.Color(0x8f8f8f), GYM_BG = new THREE.Color(0x141519);
+scene.background = STUDIO_BG;
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.55;
+
+const camera = new THREE.PerspectiveCamera(24, innerWidth / innerHeight, 0.05, 40);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.minDistance = 0.3;
+controls.maxDistance = 8;
+
+const key = new THREE.DirectionalLight(0xffffff, 2.2);
+key.position.set(1.5, 3.0, 2.6);
+key.castShadow = true;
+key.shadow.mapSize.set(4096, 4096);
+Object.assign(key.shadow.camera, { left: -1.4, right: 1.4, top: 2.0, bottom: -1.2, near: 0.5, far: 8 });
+key.shadow.bias = -0.0002;
+key.shadow.normalBias = 0.015;
+scene.add(key);
+const rim = new THREE.DirectionalLight(0xffffff, 1.0);
+rim.position.set(-2.5, 2.0, -2.5);
+scene.add(rim);
+
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.ShadowMaterial({ opacity: 0.22 }));
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+const MAT_H = 0.012;
+const mat = new THREE.Mesh(new THREE.BoxGeometry(0.75, MAT_H, 2.0), new THREE.MeshStandardMaterial({ color: 0xb8322a, roughness: 0.75 }));
+mat.position.set(0, MAT_H / 2, 0.05);
+mat.receiveShadow = true;
+mat.visible = false;
+scene.add(mat);
+
+// ───────────── 재질 ─────────────
+const clay = new THREE.MeshStandardMaterial({ color: 0xb4b4b4, roughness: 0.62, metalness: 0 });
+const skin = new THREE.MeshPhysicalMaterial({
+  color: 0xc58a68, roughness: 0.48, sheen: 0.35, sheenRoughness: 0.55, sheenColor: new THREE.Color(0xffd6c0),
+  clearcoat: 0.06, clearcoatRoughness: 0.6,
+});
+
+// ───────────── 모델 불러오기 ─────────────
+async function fetchWithProgress(url) {
+  const res = await fetch(url);
+  const total = +res.headers.get('content-length') || 0;
+  const reader = res.body.getReader();
+  const chunks = [];
+  let got = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value); got += value.length;
+    if (total) document.getElementById('pct').textContent = `${Math.round((got / total) * 100)}%`;
+  }
+  const out = new Uint8Array(got);
+  let o = 0;
+  for (const c of chunks) { out.set(c, o); o += c.length; }
+  return out.buffer;
+}
+const meta = await (await fetch('body.json')).json();
+const buf = await fetchWithProgress('body.bin');
+const L = meta.layout, VN = meta.vertices;
+const qpos = new Uint16Array(buf, L.position.offset, L.position.length);
+const qnor = new Int16Array(buf, L.normal.offset, L.normal.length);
+const position = new Float32Array(VN * 3), normal = new Float32Array(VN * 3);
+for (let i = 0; i < VN * 3; i++) {
+  const c = i % 3;
+  position[i] = meta.bboxMin[c] + (qpos[i] / 65535) * (meta.bboxMax[c] - meta.bboxMin[c]);
+  normal[i] = qnor[i] / 32767;
+}
+const geo = new THREE.BufferGeometry();
+geo.setIndex(new THREE.BufferAttribute(new Uint32Array(buf, L.index.offset, L.index.length), 1));
+geo.setAttribute('position', new THREE.BufferAttribute(position, 3));
+geo.setAttribute('normal', new THREE.BufferAttribute(normal, 3));
+geo.setAttribute('skinIndex', new THREE.BufferAttribute(new Uint8Array(buf, L.skinIndex.offset, L.skinIndex.length), 4));
+geo.setAttribute('skinWeight', new THREE.BufferAttribute(new Uint8Array(buf, L.skinWeight.offset, L.skinWeight.length), 4, true));
+
+// 복근 수축 모프: 표면을 노멀 방향으로 밀어냄 + 그에 맞는 노멀 변화
+{
+  const flex = new Int16Array(buf, L.flex.offset, L.flex.length);
+  const dPos = new Float32Array(VN * 3);
+  for (let v = 0; v < VN; v++) { const d = flex[v] * 1e-5; for (let c = 0; c < 3; c++) dPos[v * 3 + c] = normal[v * 3 + c] * d; }
+  const tmp = new THREE.BufferGeometry();
+  tmp.setIndex(geo.index);
+  tmp.setAttribute('position', new THREE.BufferAttribute(position.slice(), 3));
+  tmp.computeVertexNormals();
+  const n0 = tmp.attributes.normal.array.slice();
+  const p1 = tmp.attributes.position.array;
+  for (let i = 0; i < p1.length; i++) p1[i] += dPos[i];
+  tmp.computeVertexNormals();
+  const n1 = tmp.attributes.normal.array;
+  const dNor = new Float32Array(VN * 3);
+  for (let i = 0; i < dNor.length; i++) dNor[i] = n1[i] - n0[i];
+  geo.morphAttributes.position = [new THREE.BufferAttribute(dPos, 3)];
+  geo.morphAttributes.normal = [new THREE.BufferAttribute(dNor, 3)];
+  geo.morphTargetsRelative = true;
+}
+
+// 뼈대
+const bones = meta.bones.map((b) => { const bone = new THREE.Bone(); bone.name = b.name; return bone; });
+meta.bones.forEach((b, i) => {
+  const p = new THREE.Vector3(...b.position);
+  if (b.parent >= 0) { p.sub(new THREE.Vector3(...meta.bones[b.parent].position)); bones[b.parent].add(bones[i]); }
+  bones[i].position.copy(p);
+});
+const B = Object.fromEntries(bones.map((b) => [b.name, b]));
+
+const body = new THREE.Group();
+scene.add(body);
+const mesh = new THREE.SkinnedMesh(geo, clay);
+mesh.castShadow = mesh.receiveShadow = true;
+mesh.frustumCulled = false;
+mesh.add(bones[0]);
+body.add(mesh);
+body.updateMatrixWorld(true);
+mesh.bind(new THREE.Skeleton(bones));
+mesh.morphTargetInfluences = [0];
+
+document.getElementById('tris').textContent = `폴리곤 ${meta.triangles.toLocaleString()}개 · 꼭짓점 ${VN.toLocaleString()}개`;
+document.getElementById('loading').remove();
+
+// 누운 자세에서 등이 매트에 닿는 높이
+let backZ = 0;
+for (let v = 0; v < VN; v++) { const y = position[v * 3 + 1]; if (y > 0.88 && y < 1.45) backZ = Math.min(backZ, position[v * 3 + 2]); }
+
+// ───────────── 자세 ─────────────
+const qx = (a) => new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), a);
+const qz = (a) => new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), a);
+const SPINE_FLEX = { spine1: 0.5, spine2: 0.38, spine3: 0.26, chest: 0.1, neck: 0.12, head: 0.1 };
+
+function restPose() { bones.forEach((b) => b.quaternion.identity()); }
+function situpPose(c) {
+  restPose();
+  for (const [n, a] of Object.entries(SPINE_FLEX)) B[n].quaternion.copy(qx(a * c));
+  for (const [side, s] of [['L', 1], ['R', -1]]) {
+    // 다리: 무릎 세우기 (고관절 55°, 무릎 121°, 발목으로 발바닥을 매트에)
+    B['thigh' + side].quaternion.copy(qx(-0.96)).multiply(qz(0.04 * s));
+    B['shin' + side].quaternion.copy(qx(2.11));
+    B['foot' + side].quaternion.copy(qx(0.42));
+    // 팔: 몸 옆으로 내리고(내전) 앞으로 뻗어 무릎 쪽으로
+    // 누웠을 땐 몸 옆 매트 위, 올라갈수록 무릎 쪽으로 뻗음 (허벅지 바깥으로)
+    B['upperArm' + side].quaternion.copy(qx(-0.28 - 0.95 * c)).multiply(qz(-0.5 * s));
+  }
+}
+
+let mode = 'apose';
+const VIEWS = {
+  apose: { pos: [0.25, 1.0, 4.3], target: [0, 0.9, 0] },
+  aposeClose: { pos: [0.22, 1.16, 1.3], target: [0, 1.14, 0] },
+  situp: { pos: [3.3, 1.35, 0.55], target: [0, 0.34, -0.2] },
+  situpClose: { pos: [1.15, 0.85, 0.45], target: [0, 0.32, -0.28] },
+};
+let close = false;
+function setView() {
+  const v = VIEWS[mode === 'apose' ? (close ? 'aposeClose' : 'apose') : (close ? 'situpClose' : 'situp')];
+  camera.position.set(...v.pos); controls.target.set(...v.target); controls.update();
+}
+function setMode(m) {
+  mode = m;
+  const sit = m === 'situp';
+  body.rotation.set(sit ? -Math.PI / 2 : 0, 0, 0);
+  body.position.set(0, sit ? MAT_H - backZ : 0, sit ? 0.82 : 0);
+  mat.visible = sit;
+  scene.background = sit ? GYM_BG : STUDIO_BG;
+  floor.material.opacity = sit ? 0.35 : 0.22;
+  document.getElementById('title').textContent = sit ? '윗몸일으키기 · 1회 2초' : 'A-포즈';
+  document.getElementById('repsBox').hidden = !sit;
+  document.getElementById('mode').textContent = sit ? 'A-포즈 보기' : '윗몸일으키기 보기';
+  if (!sit) { restPose(); document.getElementById('phase').textContent = '레퍼런스 비교용 기본 자세'; }
+  setView();
+}
+setMode('apose');
+
+// ───────────── 애니메이션 ─────────────
+const PERIOD = 2.0;
+let t = 0, playing = true, last = performance.now(), flexOn = false;
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  if (playing) t += dt;
+  if (mode === 'situp') {
+    const p = (t % PERIOD) / PERIOD;
+    const c = 0.5 - 0.5 * Math.cos(p * Math.PI * 2);
+    situpPose(c);
+    mesh.morphTargetInfluences[0] = 0.25 + 0.75 * Math.min(1, c * 1.15);
+    document.getElementById('phase').textContent = p < 0.5 ? '⬆ 올라가기 (복근 수축)' : '⬇ 내려가기 (천천히 버티기)';
+    document.getElementById('reps').textContent = Math.floor(t / PERIOD);
+  } else {
+    const target = flexOn ? 1 : 0;
+    mesh.morphTargetInfluences[0] += (target - mesh.morphTargetInfluences[0]) * Math.min(1, dt * 6);
+  }
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ───────────── 버튼 ─────────────
+const $ = (id) => document.getElementById(id);
+$('mode').onclick = () => { t = 0; setMode(mode === 'apose' ? 'situp' : 'apose'); };
+$('flex').onclick = (e) => { flexOn = !flexOn; e.target.classList.toggle('on', flexOn); };
+$('close').onclick = (e) => { close = !close; e.target.classList.toggle('on', close); setView(); };
+$('mat').onclick = (e) => { const on = mesh.material === clay; mesh.material = on ? skin : clay; e.target.classList.toggle('on', on); };
+$('wire').onclick = (e) => { const on = !clay.wireframe; clay.wireframe = skin.wireframe = on; e.target.classList.toggle('on', on); };
+$('play').onclick = (e) => { playing = !playing; e.target.textContent = playing ? '일시정지' : '재생'; };
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

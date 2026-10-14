@@ -43,7 +43,16 @@ export async function startWorkoutSession(videoSeconds) {
 
 // 반환: 기록된 날짜 키 / 실패 시 Error — retryable=true 면 연결 문제(나중에 다시 시도 가능)
 export async function completeWorkout(sessionId) {
-  const { data, error } = await supabase.rpc('complete_workout', { p_session: sessionId })
+  let res
+  try {
+    res = await supabase.rpc('complete_workout', { p_session: sessionId })
+  } catch {
+    // 요청 자체가 끊김(오프라인 등) → 오류 응답과 같은 연결 문제로 처리
+    const e = new Error('서버에 연결할 수 없어요.')
+    e.retryable = true
+    throw e
+  }
+  const { data, error } = res
   if (error) {
     const e = new Error(error.message || '운동 기록에 실패했어요.')
     e.retryable = error.code !== 'P0001' // P0001 = 서버가 판단해 거절한 경우(시청 시간 부족 등)
